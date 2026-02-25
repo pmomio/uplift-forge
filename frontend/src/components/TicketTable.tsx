@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Save, ExternalLink, RefreshCw, Calculator, ArrowUp, ArrowDown, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { updateTicket, syncSingleTicket, calculateHours, calculateFields } from '../api';
-import type { MissingFilter } from '../App';
+import type { MissingFilter } from '../pages/EngineeringAttribution';
 
 type SortDirection = 'asc' | 'desc';
 interface SortState {
@@ -52,7 +52,7 @@ const TicketTable: React.FC<TicketTableProps> = ({ tickets, onUpdate, missingFil
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  const SORT_STORAGE_KEY = 'jira-field-updater-sort';
+  const SORT_STORAGE_KEY = 'uplift-forge-sort';
 
   const [sort, setSort] = useState<SortState>(() => {
     try {

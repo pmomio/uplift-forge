@@ -2,7 +2,6 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes import tickets, config as config_routes
-from scheduler import scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
@@ -18,14 +17,6 @@ app.add_middleware(
 
 app.include_router(tickets.router)
 app.include_router(config_routes.router)
-
-@app.on_event("startup")
-def startup_event():
-    scheduler.start()
-
-@app.on_event("shutdown")
-def shutdown_event():
-    scheduler.shutdown()
 
 if __name__ == "__main__":
     import uvicorn
