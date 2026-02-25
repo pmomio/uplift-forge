@@ -80,7 +80,7 @@ function App() {
         <div className="px-6 py-4 flex justify-between items-center">
           <div>
             <h1 className="text-lg font-semibold text-slate-100 tracking-tight">
-              JIRA Field Updater
+              Uplift Forge
             </h1>
             {lastSynced && (
               <p className="text-xs text-slate-400 mt-0.5">Last synced at {lastSynced}</p>
