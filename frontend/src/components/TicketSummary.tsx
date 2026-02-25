@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { MissingFilter } from '../App';
+import type { MissingFilter } from '../pages/EngineeringAttribution';
 
 interface Ticket {
   key: string;

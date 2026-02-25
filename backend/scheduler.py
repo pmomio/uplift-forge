@@ -1,13 +1,3 @@
-from apscheduler.schedulers.background import BackgroundScheduler
-from routes.tickets import sync_tickets
-from config import config
-
-scheduler = BackgroundScheduler()
-
-# Schedule the sync task
-scheduler.add_job(
-    sync_tickets,
-    'interval',
-    minutes=config.sync_config['interval_minutes'],
-    id='sync_tickets_job'
-)
+# Scheduler removed — sync is now triggered only by explicit user actions:
+# 1. "Sync Now" button in Engineering Attribution (POST /sync)
+# 2. Saving configuration when project key or filter changes (POST /config)
