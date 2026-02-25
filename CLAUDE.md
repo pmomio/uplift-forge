@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-JIRA Field Updater Service — a FastAPI + React app that automates JIRA ticket field management (engineering hours, TPD Business Unit, Work Stream) for the ACTIN team at Omio.
+Uplift Forge — a FastAPI + React app that automates JIRA ticket field management (engineering hours, TPD Business Unit, Work Stream).
 
 ## Repository Structure
 

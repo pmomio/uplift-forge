@@ -1,4 +1,4 @@
-# JIRA Field Updater Service — Technical Specification
+# Uplift Forge — Technical Specification
 
 **Version:** 3.0
 **Team:** ACTIN
@@ -8,7 +8,7 @@
 ---
 
 ## 1. Overview
-A Python-based microservice and React UI that automates and manages JIRA ticket fields. It calculates engineering time from status transitions and maps business metadata using a configurable rule engine with AND/OR logic.
+Uplift Forge is a Python-based microservice and React UI that automates and manages JIRA ticket fields. It calculates engineering time from status transitions and maps business metadata using a configurable rule engine with AND/OR logic.
 
 ## 2. Architecture & Tech Stack
 
