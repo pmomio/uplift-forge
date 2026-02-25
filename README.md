@@ -1,6 +1,6 @@
-# JIRA Field Updater Service
+# Uplift Forge
 
-A web application that automates JIRA ticket field management for the ACTIN team. It calculates engineering hours from status transitions, maps TPD Business Units and Work Streams using a flexible rule engine, and provides inline editing with push-back to JIRA.
+A web application that automates JIRA ticket field management. It calculates engineering hours from status transitions, maps TPD Business Units and Work Streams using a flexible rule engine, and provides inline editing with push-back to JIRA.
 
 ## Features
 
@@ -17,6 +17,8 @@ A web application that automates JIRA ticket field management for the ACTIN team
 
 ### 1. Clone and configure
 ```bash
+git clone git@github.com:pmomio/uplift-forge.git
+cd uplift-forge
 cp .env.example .env
 ```
 

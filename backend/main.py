@@ -6,7 +6,7 @@ from scheduler import scheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
-app = FastAPI(title="JIRA Field Updater Service")
+app = FastAPI(title="Uplift Forge")
 
 app.add_middleware(
     CORSMiddleware,
