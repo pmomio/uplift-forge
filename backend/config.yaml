@@ -1,4 +1,6 @@
 engineering_hours_end_status: Code Review
+engineering_hours_excluded_statuses:
+- Blocked
 engineering_hours_start_status: In Progress
 jira:
   base_url: https://your-org.atlassian.net
@@ -8,6 +10,18 @@ jira:
     tpd_bu: customfield_17924
     work_stream: customfield_18837
   project_key: ACTIN
+mapping_rules:
+  tpd_bu:
+    B2B: []
+    B2C: []
+    Global Expansion: []
+    O4B: []
+    Omio.AI: []
+    Rome2Rio: []
+  work_stream:
+    Operational: []
+    Product: []
+    Tech Meta Backlog: []
 office_hours:
   end: '18:00'
   exclude_weekends: true
@@ -16,14 +30,6 @@ office_hours:
 sync:
   auto_write_to_jira: false
   interval_minutes: 60
-tpd_business_unit_mapping:
-  B2B: []
-  B2C: []
-  Global Expansion: []
-  O4B: []
-  Omio.AI: []
-  Rome2Rio: []
-work_stream_mapping:
-  Operational: []
-  Product: []
-  Tech Meta Backlog: []
+ticket_filter:
+  mode: last_x_months
+  months: 6

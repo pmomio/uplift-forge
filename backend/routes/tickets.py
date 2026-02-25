@@ -8,13 +8,29 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# In-memory cache for v1
+# In-memory caches
 ticket_cache = {}
+raw_issue_cache = {}  # Stores raw JIRA issues for rule re-evaluation
+
+FINAL_STATUSES = ["Done", "Rejected", "Closed", "Resolved", "Cancelled"]
+
+def get_visible_ticket_count():
+    """Return the count of tickets that would be shown by GET /tickets."""
+    filtered = [t for t in ticket_cache.values() if t.get("status") in FINAL_STATUSES]
+    tf = config.ticket_filter
+    if tf.get("mode") == "missing_fields":
+        filtered = [t for t in filtered if not t.get("tpd_bu") or t.get("eng_hours") is None or not t.get("work_stream")]
+    return len(filtered)
 
 @router.get("/tickets")
 async def get_tickets():
-    final_statuses = ["Done", "Rejected", "Closed", "Resolved", "Cancelled"]
-    filtered = [t for t in ticket_cache.values() if t.get("status") in final_statuses]
+    filtered = [t for t in ticket_cache.values() if t.get("status") in FINAL_STATUSES]
+
+    # Apply missing_fields filter if configured
+    tf = config.ticket_filter
+    if tf.get("mode") == "missing_fields":
+        filtered = [t for t in filtered if not t.get("tpd_bu") or t.get("eng_hours") is None or not t.get("work_stream")]
+
     # Sort by updated timestamp, newest first
     return sorted(filtered, key=lambda x: x.get('updated', ''), reverse=True)
 
@@ -91,9 +107,11 @@ async def calculate_ticket_fields(key: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def process_issue(issue):
+def process_issue(issue, store_raw=True):
     try:
         key = issue['key']
+        if store_raw:
+            raw_issue_cache[key] = issue
         fields = issue.get('fields', {})
         summary = fields.get('summary', 'No Summary')
         status_obj = fields.get('status', {})
@@ -146,14 +164,25 @@ def process_issue(issue):
     except Exception as e:
         logger.exception(f"Error processing issue {issue.get('key')}")
 
+def reprocess_cache():
+    """Re-run process_issue on all cached raw issues (e.g. after rule changes)."""
+    logger.info(f"Reprocessing {len(raw_issue_cache)} cached issues with updated rules...")
+    for issue in raw_issue_cache.values():
+        process_issue(issue, store_raw=False)
+    logger.info("Reprocessing complete.")
+
+
 def sync_tickets():
     logger.info(f"Starting sync for project: {config.project_key}")
     try:
-        issues = jira_client.get_issues(config.project_key)
+        tf = config.ticket_filter
+        months = tf.get("months") if tf.get("mode") == "last_x_months" else None
+        issues = jira_client.get_issues(config.project_key, months=months)
         logger.info(f"Fetched {len(issues)} issues from JIRA.")
         
-        # Clear cache on full sync
+        # Clear caches on full sync
         ticket_cache.clear()
+        raw_issue_cache.clear()
         
         for issue in issues:
             process_issue(issue)

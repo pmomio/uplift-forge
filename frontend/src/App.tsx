@@ -2,13 +2,17 @@ import { useState, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import TicketTable from './components/TicketTable';
+import TicketSummary from './components/TicketSummary';
 import ConfigPanel from './components/ConfigPanel';
 import { getTickets, triggerSync } from './api';
+
+export type MissingFilter = 'tpd_bu' | 'eng_hours' | 'work_stream' | null;
 
 function App() {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
+  const [missingFilter, setMissingFilter] = useState<MissingFilter>(null);
 
   const fetchTickets = async () => {
     setLoading(true);
@@ -38,7 +42,21 @@ function App() {
   };
 
   useEffect(() => {
-    fetchTickets();
+    // Always sync from JIRA on dashboard load
+    const initialSync = async () => {
+      setLoading(true);
+      try {
+        await triggerSync();
+        const response = await getTickets();
+        setTickets(response.data);
+        setLastSynced(new Date().toLocaleTimeString());
+      } catch (error) {
+        console.error('Initial sync failed', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    initialSync();
   }, []);
 
   return (
@@ -95,7 +113,10 @@ function App() {
             <p className="text-sm text-slate-500">Click "Sync Now" to fetch tickets from JIRA</p>
           </div>
         ) : (
-          <TicketTable tickets={tickets} onUpdate={fetchTickets} />
+          <>
+            <TicketTable tickets={tickets} onUpdate={fetchTickets} missingFilter={missingFilter} onClearFilter={() => setMissingFilter(null)} />
+            <TicketSummary tickets={tickets} activeFilter={missingFilter} onFilterChange={setMissingFilter} />
+          </>
         )}
       </main>
     </div>

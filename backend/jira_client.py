@@ -1,5 +1,9 @@
+import logging
+from datetime import datetime, timezone
 from atlassian import Jira
 from config import config
+
+logger = logging.getLogger(__name__)
 
 class JiraClient:
     def __init__(self):
@@ -16,8 +20,25 @@ class JiraClient:
             )
         return self._client
 
-    def get_issues(self, project_key: str):
-        jql = f'project = "{project_key}" ORDER BY updated DESC'
+    def get_issues(self, project_key: str, months: int = None):
+        jql = f'project = "{project_key}"'
+        if months:
+            now = datetime.now(timezone.utc)
+            # Calculate date X months ago
+            m = now.month - months
+            y = now.year
+            while m <= 0:
+                m += 12
+                y -= 1
+            # Clamp day to valid range for the target month
+            import calendar
+            max_day = calendar.monthrange(y, m)[1]
+            d = min(now.day, max_day)
+            cutoff = now.replace(year=y, month=m, day=d)
+            date_str = cutoff.strftime("%Y-%m-%d")
+            jql += f' AND resolved >= "{date_str}"'
+        jql += ' ORDER BY updated DESC'
+        logger.info(f"JQL: {jql}")
         all_issues = []
         next_token = None
         batch_size = 100
@@ -25,6 +46,7 @@ class JiraClient:
             result = self.jira.enhanced_jql(jql, expand='changelog', nextPageToken=next_token, limit=batch_size)
             issues = result.get('issues', [])
             all_issues.extend(issues)
+            logger.info(f"Fetched batch: {len(issues)} issues (running total: {len(all_issues)})")
             if result.get('isLast', True) or not issues:
                 break
             next_token = result.get('nextPageToken')

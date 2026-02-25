@@ -51,7 +51,43 @@ def calculate_engineering_hours(histories):
     if not in_review_ts:
         return None
 
-    return compute_office_hours(in_progress_ts, in_review_ts)
+    # Find periods spent in excluded statuses (e.g. Blocked) within the window
+    excluded = [s.lower() for s in config.eng_excluded_statuses]
+    blocked_periods = []
+    blocked_start = None
+
+    for history in histories:
+        ts = datetime.fromisoformat(history['created'].replace('Z', '+00:00'))
+        if ts <= in_progress_ts or ts >= in_review_ts:
+            continue
+        for item in history['items']:
+            if item['field'] == 'status':
+                status_to = (item.get('toString') or '').lower()
+                status_from = (item.get('fromString') or '').lower()
+                if status_to in excluded and blocked_start is None:
+                    blocked_start = ts
+                elif status_from in excluded and blocked_start is not None:
+                    blocked_periods.append((blocked_start, ts))
+                    blocked_start = None
+
+    # If still in excluded status at end, cap at end timestamp
+    if blocked_start is not None:
+        blocked_periods.append((blocked_start, in_review_ts))
+
+    # Build active (non-blocked) intervals
+    if not blocked_periods:
+        return compute_office_hours(in_progress_ts, in_review_ts)
+
+    active_periods = []
+    current_start = in_progress_ts
+    for block_start, block_end in sorted(blocked_periods):
+        if current_start < block_start:
+            active_periods.append((current_start, block_start))
+        current_start = block_end
+    if current_start < in_review_ts:
+        active_periods.append((current_start, in_review_ts))
+
+    return sum(compute_office_hours(s, e) for s, e in active_periods)
 
 def compute_office_hours(start_dt, end_dt):
     tz = pytz.timezone(config.office_hours['timezone'])
@@ -86,12 +122,90 @@ def compute_office_hours(start_dt, end_dt):
     return round(total_seconds / 3600, 1)
 
 def get_mapped_fields(issue):
-    parent = issue.get('fields', {}).get('parent')
-    if not parent:
-        return None, None
-    
-    parent_key = parent.get('key')
-    tpd_bu = config.get_tpd_bu(parent_key)
-    work_stream = config.get_work_stream(parent_key)
-    
+    """Evaluate mapping rules to determine TPD BU and Work Stream."""
+    fields = issue.get('fields', {})
+    parent = fields.get('parent') or {}
+
+    context = {
+        'parent_key': parent.get('key', ''),
+        'parent_summary': (parent.get('fields') or {}).get('summary', ''),
+        'labels': fields.get('labels', []),
+        'components': [c.get('name', '') for c in fields.get('components', [])],
+        'summary': fields.get('summary', ''),
+        'issue_type': (fields.get('issuetype') or {}).get('name', ''),
+        'priority': (fields.get('priority') or {}).get('name', ''),
+        'assignee': (fields.get('assignee') or {}).get('displayName', ''),
+    }
+
+    rules = config.mapping_rules
+    tpd_bu = _match_first_group(context, rules.get('tpd_bu', {}))
+    work_stream = _match_first_group(context, rules.get('work_stream', {}))
+
     return tpd_bu, work_stream
+
+
+def _match_first_group(context, groups):
+    """Return the name of the first group with a matching block, or None.
+
+    Each group value is a list of AND-blocks (Rule[][]).
+    An AND-block matches when ALL its rules match.
+    A group matches when ANY of its AND-blocks matches (OR across blocks).
+
+    For backward compatibility, a flat list of rule dicts (Rule[]) is treated
+    as individual OR blocks (each rule is its own single-rule AND-block).
+    """
+    for group_name, blocks in groups.items():
+        if not blocks:
+            continue
+        # Backward compat: if first element is a dict, it's the old flat Rule[] format
+        if isinstance(blocks[0], dict):
+            # Old format: each rule is an independent OR condition
+            for rule in blocks:
+                if _evaluate_rule(context, rule):
+                    return group_name
+        else:
+            # New format: list of AND-blocks
+            for block in blocks:
+                if block and all(_evaluate_rule(context, rule) for rule in block):
+                    return group_name
+    return None
+
+
+def _evaluate_rule(context, rule):
+    """Evaluate a single rule against the context."""
+    field = rule.get('field', '')
+    operator = rule.get('operator', '')
+    value = str(rule.get('value', ''))
+
+    field_value = context.get(field)
+    if field_value is None:
+        return False
+
+    # Array fields (labels, components)
+    if isinstance(field_value, list):
+        items = [str(v).lower() for v in field_value]
+        val = value.lower()
+        if operator == 'equals':
+            return val in items
+        elif operator == 'contains':
+            return any(val in item for item in items)
+        elif operator == 'starts_with':
+            return any(item.startswith(val) for item in items)
+        elif operator == 'in':
+            targets = [v.strip().lower() for v in value.split(',')]
+            return bool(set(items) & set(targets))
+        return False
+
+    # Scalar fields
+    fv = str(field_value).lower()
+    val = value.lower()
+    if operator == 'equals':
+        return fv == val
+    elif operator == 'contains':
+        return val in fv
+    elif operator == 'starts_with':
+        return fv.startswith(val)
+    elif operator == 'in':
+        targets = [v.strip().lower() for v in value.split(',')]
+        return fv in targets
+    return False

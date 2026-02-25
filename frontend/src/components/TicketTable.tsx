@@ -1,7 +1,14 @@
-import React, { useState } from 'react';
-import { Save, ExternalLink, RefreshCw, Calculator } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Save, ExternalLink, RefreshCw, Calculator, ArrowUp, ArrowDown, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { updateTicket, syncSingleTicket, calculateHours, calculateFields } from '../api';
+import type { MissingFilter } from '../App';
+
+type SortDirection = 'asc' | 'desc';
+interface SortState {
+  column: string | null;
+  direction: SortDirection;
+}
 
 interface Ticket {
   key: string;
@@ -18,6 +25,8 @@ interface Ticket {
 interface TicketTableProps {
   tickets: Ticket[];
   onUpdate: () => void;
+  missingFilter: MissingFilter;
+  onClearFilter: () => void;
 }
 
 const statusColors: Record<string, string> = {
@@ -29,7 +38,13 @@ const statusColors: Record<string, string> = {
 };
 const defaultStatusColor = 'bg-sky-500/15 text-sky-300 ring-sky-400/30';
 
-const TicketTable: React.FC<TicketTableProps> = ({ tickets, onUpdate }) => {
+const filterLabels: Record<string, string> = {
+  tpd_bu: 'TPD BU',
+  eng_hours: 'Eng Hours',
+  work_stream: 'Work Stream',
+};
+
+const TicketTable: React.FC<TicketTableProps> = ({ tickets, onUpdate, missingFilter, onClearFilter }) => {
   const [editing, setEditing] = useState<Record<string, Partial<Ticket>>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [syncingRow, setSyncingRow] = useState<string | null>(null);
@@ -37,9 +52,74 @@ const TicketTable: React.FC<TicketTableProps> = ({ tickets, onUpdate }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
-  const totalPages = Math.ceil(tickets.length / pageSize);
+  const SORT_STORAGE_KEY = 'jira-field-updater-sort';
+
+  const [sort, setSort] = useState<SortState>(() => {
+    try {
+      const stored = localStorage.getItem(SORT_STORAGE_KEY);
+      if (stored) return JSON.parse(stored);
+    } catch {}
+    return { column: null, direction: 'asc' };
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(sort));
+    } catch {}
+  }, [sort]);
+
+  const handleSort = useCallback((column: string) => {
+    setSort(prev => {
+      if (prev.column === column) {
+        return { column, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { column, direction: 'asc' };
+    });
+    setCurrentPage(1);
+  }, []);
+
+  const resetSort = useCallback(() => {
+    setSort({ column: null, direction: 'asc' });
+    setCurrentPage(1);
+  }, []);
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [missingFilter]);
+
+  const filteredTickets = useMemo(() => {
+    if (!missingFilter) return tickets;
+    return tickets.filter(t => {
+      if (missingFilter === 'tpd_bu') return !t.tpd_bu;
+      if (missingFilter === 'eng_hours') return t.eng_hours == null;
+      if (missingFilter === 'work_stream') return !t.work_stream;
+      return true;
+    });
+  }, [tickets, missingFilter]);
+
+  const sortedTickets = useMemo(() => {
+    if (!sort.column) return filteredTickets;
+    return [...filteredTickets].sort((a, b) => {
+      const col = sort.column as keyof Ticket;
+      let aVal = a[col];
+      let bVal = b[col];
+      // Nulls/empty always sort last
+      if (aVal == null || aVal === '') return 1;
+      if (bVal == null || bVal === '') return -1;
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sort.direction === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+      const aStr = String(aVal).toLowerCase();
+      const bStr = String(bVal).toLowerCase();
+      const cmp = aStr.localeCompare(bStr);
+      return sort.direction === 'asc' ? cmp : -cmp;
+    });
+  }, [filteredTickets, sort]);
+
+  const totalPages = Math.ceil(sortedTickets.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
-  const paginatedTickets = tickets.slice(startIndex, startIndex + pageSize);
+  const paginatedTickets = sortedTickets.slice(startIndex, startIndex + pageSize);
 
   const handleFieldChange = (key: string, field: string, value: any) => {
     setEditing(prev => ({
@@ -137,18 +217,63 @@ const TicketTable: React.FC<TicketTableProps> = ({ tickets, onUpdate }) => {
 
   return (
     <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden shadow-xl shadow-black/20">
+      {missingFilter && (
+        <div className="px-4 py-2 bg-rose-500/10 border-b border-rose-500/20 flex items-center justify-between">
+          <span className="text-xs text-rose-300">
+            Showing tickets with missing <span className="font-semibold">{filterLabels[missingFilter]}</span>
+            <span className="text-rose-400/60 ml-1.5">({sortedTickets.length} ticket{sortedTickets.length !== 1 ? 's' : ''})</span>
+          </span>
+          <button
+            onClick={onClearFilter}
+            className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 hover:bg-slate-700/50 px-2 py-0.5 rounded transition-colors"
+          >
+            <X size={12} />
+            Clear filter
+          </button>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-sm table-auto">
           <thead>
             <tr className="border-b border-slate-700/60 bg-slate-800/80">
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Key</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Summary</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Assignee</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">TPD BU</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Eng Hours</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Work Stream</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+              {([
+                { key: 'key', label: 'Key' },
+                { key: 'summary', label: 'Summary' },
+                { key: 'status', label: 'Status' },
+                { key: 'assignee', label: 'Assignee' },
+                { key: 'tpd_bu', label: 'TPD BU' },
+                { key: 'eng_hours', label: 'Eng Hours' },
+                { key: 'work_stream', label: 'Work Stream' },
+              ] as const).map(col => (
+                <th
+                  key={col.key}
+                  onClick={() => handleSort(col.key)}
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer select-none hover:text-slate-200 transition-colors"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    {col.label}
+                    {sort.column === col.key && (
+                      sort.direction === 'asc'
+                        ? <ArrowUp size={12} className="text-indigo-400" />
+                        : <ArrowDown size={12} className="text-indigo-400" />
+                    )}
+                  </span>
+                </th>
+              ))}
+              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <span className="inline-flex items-center gap-1.5">
+                  Actions
+                  {sort.column && (
+                    <button
+                      onClick={resetSort}
+                      className="text-slate-500 hover:text-rose-400 hover:bg-rose-400/10 p-0.5 rounded transition-colors"
+                      title="Reset sorting"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-700/40">
@@ -298,9 +423,10 @@ const TicketTable: React.FC<TicketTableProps> = ({ tickets, onUpdate }) => {
       {/* Pagination */}
       <div className="flex justify-between items-center px-4 py-3 border-t border-slate-700/50 bg-slate-800/40">
         <p className="text-sm text-slate-400">
-          Showing <span className="font-medium text-slate-300">{startIndex + 1}</span> to{' '}
-          <span className="font-medium text-slate-300">{Math.min(startIndex + pageSize, tickets.length)}</span> of{' '}
-          <span className="font-medium text-slate-300">{tickets.length}</span> tickets
+          Showing <span className="font-medium text-slate-300">{sortedTickets.length > 0 ? startIndex + 1 : 0}</span> to{' '}
+          <span className="font-medium text-slate-300">{Math.min(startIndex + pageSize, sortedTickets.length)}</span> of{' '}
+          <span className="font-medium text-slate-300">{sortedTickets.length}</span> tickets
+          {missingFilter && <span className="text-slate-500 ml-1">(filtered from {tickets.length})</span>}
         </p>
         <div className="flex items-center gap-2">
           <button
