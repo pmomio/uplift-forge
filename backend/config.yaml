@@ -1,0 +1,29 @@
+engineering_hours_end_status: Code Review
+engineering_hours_start_status: In Progress
+jira:
+  base_url: https://your-org.atlassian.net
+  email: your-email@omio.com
+  field_ids:
+    eng_hours: customfield_18466
+    tpd_bu: customfield_17924
+    work_stream: customfield_18837
+  project_key: ACTIN
+office_hours:
+  end: '18:00'
+  exclude_weekends: true
+  start: 09:00
+  timezone: Europe/Berlin
+sync:
+  auto_write_to_jira: false
+  interval_minutes: 60
+tpd_business_unit_mapping:
+  B2B: []
+  B2C: []
+  Global Expansion: []
+  O4B: []
+  Omio.AI: []
+  Rome2Rio: []
+work_stream_mapping:
+  Operational: []
+  Product: []
+  Tech Meta Backlog: []

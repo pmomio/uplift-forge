@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+atlassian-python-api
+pyyaml
+apscheduler
+python-dotenv
+requests
+pytz
+pytest
+httpx
