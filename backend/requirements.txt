@@ -7,4 +7,5 @@ python-dotenv
 requests
 pytz
 pytest
+pytest-cov
 httpx
