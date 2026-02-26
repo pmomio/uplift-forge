@@ -1,4 +1,4 @@
-.PHONY: setup run-backend run-frontend docker-up docker-down test
+.PHONY: setup run-backend run-frontend docker-up docker-down test test-backend test-frontend test-frontend-coverage
 
 setup:
 	@echo "Setting up backend..."
@@ -18,5 +18,13 @@ docker-up:
 docker-down:
 	docker-compose down
 
-test:
-	cd backend && ./.venv/bin/pytest test_field_engine.py test_integration.py -v
+test: test-backend test-frontend
+
+test-backend:
+	cd backend && ./.venv/bin/pytest --tb=short -q
+
+test-frontend:
+	cd frontend && npx vitest run
+
+test-frontend-coverage:
+	cd frontend && npx vitest run --coverage

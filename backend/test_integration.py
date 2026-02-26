@@ -180,13 +180,13 @@ class TestSyncTicketsFilter:
     """Verify sync_tickets() reads ticket_filter from config and passes
     the correct months value to jira_client.get_issues()."""
 
-    def test_sync_mode_all_passes_no_months(self):
+    def test_sync_mode_all_passes_12_months(self):
         config.ticket_filter = {"mode": "all", "months": 3}
 
         with patch("routes.tickets.jira_client") as mock_jira:
             mock_jira.get_issues.return_value = []
             client.post("/sync")
-            mock_jira.get_issues.assert_called_once_with(config.project_key, months=None)
+            mock_jira.get_issues.assert_called_once_with(config.project_key, months=12)
 
     def test_sync_mode_last_x_months_passes_months_3(self):
         config.ticket_filter = {"mode": "last_x_months", "months": 3}
@@ -212,13 +212,13 @@ class TestSyncTicketsFilter:
             client.post("/sync")
             mock_jira.get_issues.assert_called_once_with(config.project_key, months=12)
 
-    def test_sync_mode_missing_fields_passes_no_months(self):
+    def test_sync_mode_missing_fields_passes_months(self):
         config.ticket_filter = {"mode": "missing_fields", "months": 3}
 
         with patch("routes.tickets.jira_client") as mock_jira:
             mock_jira.get_issues.return_value = []
             client.post("/sync")
-            mock_jira.get_issues.assert_called_once_with(config.project_key, months=None)
+            mock_jira.get_issues.assert_called_once_with(config.project_key, months=3)
 
 
 # ---------------------------------------------------------------------------
