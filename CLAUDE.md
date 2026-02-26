@@ -2,145 +2,134 @@
 
 ## Project Overview
 
-Uplift Forge — a FastAPI + React engineering team performance platform. Connects to JIRA to auto-compute engineering hours, map business metadata via a rule engine, and track team & individual KPIs with trend analysis. UI is personalized with JIRA project name, avatar, and lead.
+Uplift Forge — an Electron desktop app for engineering team performance. Connects to JIRA via Atlassian OAuth 2.0 SSO to auto-compute engineering hours, map business metadata via a rule engine, and track team & individual KPIs with trend analysis. No Python, no `.env`, no manual config — users install, sign in, and go.
+
+## Architecture
+
+- **Runtime**: Electron (main process = Node.js/TypeScript backend, renderer = React frontend)
+- **Frontend-Backend**: Electron IPC (no HTTP server)
+- **Auth**: Atlassian OAuth 2.0 (3LO) — tokens encrypted via `safeStorage` (OS Keychain)
+- **Persistence**: `electron-store` JSON files in OS app data directory
+- **Packaging**: electron-forge (.dmg for Mac, .exe for Windows)
+- **Timezone math**: luxon library
 
 ## Repository Structure
 
 ```
-backend/           Python FastAPI backend
-  main.py          App entrypoint, CORS, router registration (no scheduler)
-  config.py        Config class, loads config.yaml, persists changes
-  config.yaml      All settings (project key, field IDs, mapping rules, filters, sp_to_days)
-  jira_client.py   JIRA API wrapper (enhanced_jql, pagination, project metadata)
-  field_engine.py  Engineering hours calc + rule-based field mapping
-  scheduler.py     (deprecated — scheduler removed, sync is on-demand only)
-  routes/
-    tickets.py     Ticket CRUD, sync, caches, team & individual metrics endpoints
-    config.py      Config GET/POST, JIRA field/status/project/member listing
-  conftest.py              Shared test fixtures
-  pytest.ini               Pytest config with coverage thresholds
-  test_field_engine.py     Unit tests for office hours and eng hours calc
-  test_integration.py      Integration tests (filters, JQL, rules)
-  test_config.py           Config module tests
-  test_jira_client.py      JIRA client tests
-  test_main.py             App entrypoint tests
-  test_routes_tickets.py   Ticket route tests
-  test_routes_config.py    Config route tests
-frontend/          React 19 + TypeScript + Vite 7
+uplift-forge/
+  package.json                    # Electron-forge + all deps
+  forge.config.ts                 # Electron Forge config (makers, plugins)
+  tsconfig.json                   # Main process TS config
+  tsconfig.renderer.json          # Renderer TS config
+  vite.main.config.ts             # Vite config for main process
+  vite.renderer.config.ts         # Vite config for renderer
+  vite.preload.config.ts          # Vite config for preload
+  vitest.config.ts                # Test configuration
+  postcss.config.js               # PostCSS for Tailwind
+
   src/
-    App.tsx        Root component, layout, project info provider
-    api.ts         Axios client, all API calls
-    test-setup.ts  Vitest setup (jest-dom matchers)
-    components/
-      ConfigPanel.tsx    Feature-organized configuration page
-      RuleBuilder.tsx    Visual AND/OR rule builder (indigo/emerald/violet themes)
-      ModalDialog.tsx    Reusable prompt/confirm modal
-      TicketTable.tsx    Attribution table with inline editing
-      TicketSummary.tsx  Summary stats bar
-      Sidebar.tsx        Navigation with project branding
-      __tests__/         Component test files
-    pages/
-      HomePage.tsx                Welcome page with project personalization
-      TeamMetrics.tsx             KPI dashboard with charts, trends, help tooltips
-      IndividualMetrics.tsx       Per-engineer KPIs with team comparison
-      EngineeringAttribution.tsx  Ticket-level field management
-      __tests__/                  Page test files
-  vite.config.ts   Build + test config with coverage thresholds
+    main/                         # Electron main process (Node.js backend)
+      index.ts                    # BrowserWindow, app lifecycle, IPC registration
+      preload.ts                  # contextBridge API exposure
+
+      auth/
+        oauth.ts                  # Atlassian OAuth 2.0 (3LO) flow
+        token-store.ts            # Encrypted token storage (safeStorage + electron-store)
+
+      services/
+        config.service.ts         # electron-store config
+        jira.service.ts           # JIRA REST API v3 with OAuth Bearer tokens
+        field-engine.service.ts   # Office hours calc + rule engine
+        ticket.service.ts         # Cache mgmt, sync, processIssue
+        metrics.service.ts        # Team + individual KPIs
+
+      ipc/
+        handlers.ts               # All ipcMain.handle() registrations
+
+    renderer/                     # React frontend
+      index.html
+      main.tsx
+      App.tsx                     # Auth state gating + layout
+      api.ts                      # IPC calls with {data} wrapper
+      electron.d.ts               # Type declarations for window.api
+      components/                 # Sidebar, ConfigPanel, RuleBuilder, ModalDialog, TicketTable, TicketSummary
+      pages/                      # LoginPage, HomePage, TeamMetrics, IndividualMetrics, EngineeringAttribution
+
+    shared/
+      types.ts                    # Shared TypeScript interfaces
+      channels.ts                 # IPC channel name constants
+
+  test/
+    main/                         # Main process tests
 ```
 
 ## Development Commands
 
 ```bash
-make setup                  # Install all dependencies (backend venv + frontend npm)
-make run-backend            # FastAPI on :8000
-make run-frontend           # Vite dev server on :5173
-make test                   # Run all tests (backend + frontend)
-make test-backend           # Backend pytest with coverage
-make test-frontend          # Frontend vitest
-make test-frontend-coverage # Frontend vitest with coverage report
-make docker-up              # Docker Compose build + start
-make docker-down            # Stop Docker services
+make setup          # npm install
+make dev            # npm start (electron-forge dev)
+make test           # npm test (vitest)
+make test-coverage  # npm run test:coverage
+make package        # npm run package
+make make-dist      # npm run make (produces .dmg/.exe)
 ```
 
 ## Running Tests
 
-Backend:
 ```bash
-cd backend && .venv/bin/pytest --tb=short -q
+npm test                    # All tests
+npm run test:coverage       # With coverage report
 ```
-
-Frontend:
-```bash
-cd frontend && npx vitest run
-cd frontend && npx vitest run --coverage   # with coverage report
-```
-
-Or via Makefile: `make test`
 
 ## Test Coverage Policy
 
-**All code changes must maintain >90% test coverage.** This is enforced by:
+**All code changes must maintain >90% test coverage.** Enforced by vitest with thresholds:
+- Statements: 90%, Branches: 80%, Functions: 85%, Lines: 90%
 
-- **Backend:** pytest-cov with `--cov-fail-under=90` (currently ~99%)
-- **Frontend:** @vitest/coverage-v8 with thresholds `{ statements: 90, branches: 80, functions: 85, lines: 90 }` (currently ~96%)
-
-When adding new features or modifying existing code:
-1. Write tests for all new code paths (happy path + error handling).
-2. Run `make test` locally before pushing.
-3. Run `make test-frontend-coverage` to verify frontend thresholds are met.
-4. Backend coverage is checked automatically by pytest on every run.
-
-### Frontend testing conventions
-- Mock `react-hot-toast` in every test file that renders components using toast: `vi.mock('react-hot-toast', () => ({ default: { success: vi.fn(), error: vi.fn() } }))`
+### Testing conventions
+- Mock `electron-store` as in-memory object in main process tests
+- Mock `window.api` instead of axios in renderer tests
+- Mock `react-hot-toast` in every test file that renders components using toast
 - Mock `recharts` in test files that render chart components (no canvas in jsdom)
-- Use `container.querySelector('img[src="..."]')` instead of `getByRole('img')` — `<img alt="">` doesn't get `role="img"` in jsdom
-- Use `getAllByText()` when text appears in multiple elements (e.g. sidebar + page header)
-- Controlled selects with `value=""` don't respond well to `fireEvent.change` — test option availability instead of interaction
-
-## TypeScript Check
-
-```bash
-cd frontend && npx tsc --noEmit
-```
+- The `{ data }` wrapper in api.ts means component tests need minimal changes from the old Axios pattern
 
 ## Key Technical Decisions
 
-- **No background scheduler:** Sync is triggered only by explicit user actions (Sync button or config save). APScheduler was removed.
-- **JIRA Cloud API**: Must use `enhanced_jql` (not `jql`). Pagination uses `nextPageToken`/`isLast`.
-- **Absolute dates in JQL**: This JIRA instance silently returns 0 results for relative dates. All date filters use absolute dates.
-- **12-month data cap**: Time range is capped at 12 months to prevent excessive JIRA queries. Legacy `mode: "all"` is treated as 12 months.
-- **Rule engine data model**: `Rule[][]` per group — inner arrays are AND-blocks, outer array OR's them. Old flat `Rule[]` format is auto-detected.
-- **Raw issue cache**: `raw_issue_cache` stores full JIRA payloads so rules can be re-evaluated without re-fetching.
-- **SP calibration**: `sp_to_days` config (default 1) defines man-days per story point. Used in estimation accuracy: `(SP x sp_to_days x 8) / eng_hours`.
-- **Toast deduplication**: All `react-hot-toast` calls use `{ id: ... }` to prevent duplicate notifications on rapid clicks.
-- **Fixed-position tooltips**: Help tooltips and trend tooltips use `getBoundingClientRect()` + `position: fixed` + `z-[9999]` to avoid clipping by overflow parents.
-- **Feature-organized config**: ConfigPanel groups settings into JIRA Connection, Team Metrics, Engineering Attribution, Engineering Hours Calculation, and Individual Metrics sections.
-- **Project personalization**: `GET /jira/project` fetches name/avatar/lead from JIRA. Passed as `ProjectInfo` prop through App → Sidebar, HomePage, TeamMetrics, IndividualMetrics, EngineeringAttribution.
-- **No native browser dialogs**: All `prompt()`/`confirm()`/`alert()` replaced with `ModalDialog`. Notifications via `react-hot-toast`.
-- **Config persistence**: All config saved to `config.yaml` via `yaml.safe_dump`. Secrets stay in `.env`.
+- **Electron IPC**: All frontend-backend communication via `ipcMain.handle()` / `ipcRenderer.invoke()`. No HTTP server.
+- **Atlassian OAuth 2.0**: Tokens stored encrypted via `safeStorage`. Auto-refresh on expiry.
+- **JIRA Cloud REST API v3**: Uses `https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/...` with Bearer tokens. Pagination uses `nextPageToken`/`isLast`.
+- **Absolute dates in JQL**: This JIRA instance silently returns 0 results for relative dates.
+- **12-month data cap**: Time range capped at 12 months. Legacy `mode: "all"` treated as 12 months.
+- **Rule engine data model**: `Rule[][]` per group — inner arrays are AND-blocks, outer array OR's them. Old flat `Rule[]` format auto-detected.
+- **Ticket cache persistence**: In-memory Maps persisted to `electron-store` so data survives app restarts.
+- **SP calibration**: `sp_to_days` config (default 1) defines man-days per story point.
+- **Toast deduplication**: All `react-hot-toast` calls use `{ id: ... }`.
+- **api.ts wraps IPC with `{ data }`**: Components keep using `res.data` unchanged.
+- **External links**: Use `window.api.openExternal(url)` instead of `<a target="_blank">`.
 
 ## Code Conventions
 
-- Backend: Python 3.11+, FastAPI routers, no ORMs (in-memory caches)
-- Frontend: React 19, TypeScript strict, Tailwind CSS v4 (dark slate theme, feature-colored accents: indigo=shared, cyan=metrics, violet=attribution, emerald=eng hours, orange=individual)
+- All code: TypeScript strict
+- Frontend: React 19, Tailwind CSS v4 (dark slate theme, feature-colored accents: indigo=shared, cyan=metrics, violet=attribution, emerald=eng hours, orange=individual)
 - Charts: Recharts (LineChart, BarChart, PieChart)
 - Icons: Lucide React only
-- Tests: Backend uses pytest + unittest.mock; Frontend uses vitest + @testing-library/react + @testing-library/jest-dom
+- Tests: Vitest + @testing-library/react + @testing-library/jest-dom
+- Timezone: luxon (DateTime, setZone)
 - Commit style: imperative mood, concise summary line
 
-## Environment Variables (.env)
+## Environment Variables
 
 ```
-JIRA_API_TOKEN=   # Required
-JIRA_EMAIL=       # Required
-JIRA_BASE_URL=    # Required, e.g. https://your-org.atlassian.net
+ATLASSIAN_CLIENT_ID=      # OAuth app Client ID (from Atlassian Developer Console)
+ATLASSIAN_CLIENT_SECRET=  # OAuth app Client Secret
 ```
 
 ## Things to Watch Out For
 
-- `atlassian-python-api` `jql()` is deprecated for Cloud — always use `enhanced_jql()`
 - The `total` field in JIRA search responses returns 0 (unreliable) — rely on `isLast` for pagination
-- Changing project key or ticket filter triggers a full re-sync; changing only mapping rules triggers `reprocess_cache()`
+- Changing project key or ticket filter triggers a full re-sync; changing only mapping rules triggers `reprocessCache()`
 - Final statuses for dashboard display: Done, Rejected, Closed, Resolved, Cancelled
-- `config.yaml` `ticket_filter.mode` accepts `last_x_months` or `missing_fields` (legacy `all` is treated as 12 months)
+- `ticket_filter.mode` accepts `last_x_months` or `missing_fields` (legacy `all` treated as 12 months)
 - RuleBuilder `color` prop accepts `indigo`, `emerald`, or `violet`
+- `safeStorage` is only available after `app.ready` — don't call token-store before that
+- electron-store files are in OS app data dir (not the repo)
