@@ -20,7 +20,8 @@ async def get_config():
         "eng_end_status": app_config.eng_end_status,
         "eng_excluded_statuses": app_config.eng_excluded_statuses,
         "ticket_filter": app_config.ticket_filter,
-        "sp_to_days": app_config.sp_to_days
+        "sp_to_days": app_config.sp_to_days,
+        "tracked_engineers": app_config.tracked_engineers,
     }
 
 @router.get("/jira/project")
@@ -34,6 +35,33 @@ async def get_jira_project():
             "avatar": project.get("avatarUrls", {}).get("48x48"),
         }
     except Exception as e:
+        return {"error": str(e)}
+
+@router.get("/jira/members")
+async def get_jira_members():
+    """Extract unique assignees from synced tickets (actual team members, not whole org)."""
+    from routes.tickets import raw_issue_cache
+    try:
+        members = []
+        seen = set()
+        for issue in raw_issue_cache.values():
+            assignee_obj = issue.get("fields", {}).get("assignee")
+            if not assignee_obj:
+                continue
+            account_id = assignee_obj.get("accountId")
+            if not account_id or account_id in seen:
+                continue
+            seen.add(account_id)
+            members.append({
+                "accountId": account_id,
+                "displayName": assignee_obj.get("displayName", "Unknown"),
+                "avatar": (assignee_obj.get("avatarUrls") or {}).get("48x48"),
+                "active": assignee_obj.get("active", True),
+            })
+        members.sort(key=lambda m: m["displayName"])
+        return members
+    except Exception as e:
+        logger.exception("Failed to extract team members from cache")
         return {"error": str(e)}
 
 @router.get("/jira/statuses")
@@ -75,6 +103,7 @@ async def update_config_route(payload: dict):
     ticket_filter = payload.get("ticket_filter")
     mapping_rules = payload.get("mapping_rules")
     sp_to_days = payload.get("sp_to_days")
+    tracked_engineers = payload.get("tracked_engineers")
 
     project_key_changed = new_project_key and new_project_key != app_config.project_key
     filter_changed = ticket_filter is not None and ticket_filter != app_config.ticket_filter
@@ -88,7 +117,8 @@ async def update_config_route(payload: dict):
         eng_excluded_statuses=eng_excluded_statuses,
         ticket_filter=ticket_filter,
         mapping_rules=mapping_rules,
-        sp_to_days=sp_to_days
+        sp_to_days=sp_to_days,
+        tracked_engineers=tracked_engineers,
     )
 
     needs_sync = project_key_changed or filter_changed

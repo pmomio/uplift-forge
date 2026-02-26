@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import HomePage from './pages/HomePage';
 import EngineeringAttribution from './pages/EngineeringAttribution';
 import TeamMetrics from './pages/TeamMetrics';
+import IndividualMetrics from './pages/IndividualMetrics';
 import ConfigPanel from './components/ConfigPanel';
 import { getJiraProject } from './api';
 
@@ -56,6 +57,7 @@ function App() {
         {activeTab === 'home' && <HomePage project={project} />}
         {activeTab === 'attribution' && <EngineeringAttribution refreshKey={refreshKey} project={project} />}
         {activeTab === 'metrics' && <TeamMetrics refreshKey={refreshKey} project={project} />}
+        {activeTab === 'individual' && <IndividualMetrics refreshKey={refreshKey} project={project} />}
         {activeTab === 'config' && <ConfigPanel onConfigSaved={handleConfigSaved} />}
       </main>
     </div>

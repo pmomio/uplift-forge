@@ -18,5 +18,7 @@ export const getJiraFields = () => api.get('/jira/fields');
 export const getJiraStatuses = () => api.get('/jira/statuses');
 export const getJiraProject = () => api.get('/jira/project');
 export const getTeamMetrics = (period: string = 'all') => api.get('/metrics/team', { params: { period } });
+export const getJiraMembers = () => api.get('/jira/members');
+export const getIndividualMetrics = (period: string = 'all') => api.get('/metrics/individual', { params: { period } });
 
 export default api;
