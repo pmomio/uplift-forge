@@ -10,9 +10,11 @@ type AxiosLike<T> = { data: T };
 const wrap = <T>(p: Promise<T>): Promise<AxiosLike<T>> => p.then((data) => ({ data }));
 
 // Auth
-export const login = () => wrap(window.api.login());
+export const login = (baseUrl: string, email: string, apiToken: string) =>
+  wrap(window.api.login(baseUrl, email, apiToken));
 export const logout = () => wrap(window.api.logout());
 export const getAuthState = () => wrap(window.api.getAuthState());
+export const resetApp = () => wrap(window.api.resetApp());
 
 // Config
 export const getConfig = () => wrap(window.api.getConfig());
@@ -37,3 +39,7 @@ export const triggerSync = () => wrap(window.api.triggerSync());
 // Metrics
 export const getTeamMetrics = (period = 'all') => wrap(window.api.getTeamMetrics(period));
 export const getIndividualMetrics = (period = 'all') => wrap(window.api.getIndividualMetrics(period));
+
+// Update
+export const checkForUpdates = () => wrap(window.api.checkForUpdates());
+export const downloadUpdate = () => wrap(window.api.downloadUpdate());

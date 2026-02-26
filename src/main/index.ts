@@ -1,9 +1,11 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
+import started from 'electron-squirrel-startup';
 import { registerIpcHandlers } from './ipc/handlers.js';
+import { startPeriodicCheck } from './services/update.service.js';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if ((await import('electron-squirrel-startup')).default) {
+if (started) {
   app.quit();
 }
 
@@ -41,7 +43,10 @@ const createWindow = (): void => {
 // Register IPC handlers before window creation
 registerIpcHandlers();
 
-app.on('ready', createWindow);
+app.on('ready', () => {
+  createWindow();
+  startPeriodicCheck();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

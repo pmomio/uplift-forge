@@ -1,11 +1,11 @@
 import { ipcMain, shell } from 'electron';
 import { Channels } from '../../shared/channels.js';
-import { startOAuthFlow } from '../auth/oauth.js';
-import { clearTokens, isAuthenticated, getEmail, getCloudId } from '../auth/token-store.js';
+import { saveCredentials, clearCredentials, isAuthenticated, getEmail, getBaseUrl, emitAuthStateChanged } from '../auth/token-store.js';
 import { getConfig, updateConfig } from '../services/config.service.js';
 import * as jiraService from '../services/jira.service.js';
 import * as ticketService from '../services/ticket.service.js';
 import * as metricsService from '../services/metrics.service.js';
+import * as updateService from '../services/update.service.js';
 import type { AuthState } from '../../shared/types.js';
 
 /**
@@ -13,20 +13,26 @@ import type { AuthState } from '../../shared/types.js';
  */
 export function registerIpcHandlers(): void {
   // ----- Auth -----
-  ipcMain.handle(Channels.AUTH_LOGIN, async () => {
-    await startOAuthFlow();
-    return { status: 'authenticated', email: getEmail(), cloudId: getCloudId() };
+  ipcMain.handle(Channels.AUTH_LOGIN, async (_event, baseUrl: string, email: string, apiToken: string) => {
+    saveCredentials(baseUrl, email, apiToken);
+    emitAuthStateChanged();
+    return { status: 'authenticated', email, baseUrl } as AuthState;
   });
 
   ipcMain.handle(Channels.AUTH_LOGOUT, () => {
-    clearTokens();
+    clearCredentials();
     return { status: 'unauthenticated' };
   });
 
   ipcMain.handle(Channels.AUTH_STATE, (): AuthState => {
     if (isAuthenticated()) {
-      return { status: 'authenticated', email: getEmail() ?? undefined, cloudId: getCloudId() ?? undefined };
+      return { status: 'authenticated', email: getEmail() ?? undefined, baseUrl: getBaseUrl() ?? undefined };
     }
+    return { status: 'unauthenticated' };
+  });
+
+  ipcMain.handle(Channels.AUTH_RESET, () => {
+    clearCredentials();
     return { status: 'unauthenticated' };
   });
 
@@ -120,4 +126,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(Channels.OPEN_EXTERNAL, (_event, url: string) => {
     return shell.openExternal(url);
   });
+
+  // ----- Update -----
+  ipcMain.handle(Channels.UPDATE_CHECK, () => updateService.checkForUpdates());
+  ipcMain.handle(Channels.UPDATE_DOWNLOAD, () => updateService.downloadUpdate());
 }

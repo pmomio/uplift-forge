@@ -6,9 +6,11 @@ import { Channels } from '../shared/channels.js';
  */
 const api = {
   // Auth
-  login: () => ipcRenderer.invoke(Channels.AUTH_LOGIN),
+  login: (baseUrl: string, email: string, apiToken: string) =>
+    ipcRenderer.invoke(Channels.AUTH_LOGIN, baseUrl, email, apiToken),
   logout: () => ipcRenderer.invoke(Channels.AUTH_LOGOUT),
   getAuthState: () => ipcRenderer.invoke(Channels.AUTH_STATE),
+  resetApp: () => ipcRenderer.invoke(Channels.AUTH_RESET),
   onAuthStateChanged: (callback: (state: unknown) => void) => {
     const listener = (_event: unknown, state: unknown) => callback(state);
     ipcRenderer.on(Channels.AUTH_STATE_CHANGED, listener);
@@ -41,6 +43,15 @@ const api = {
 
   // Shell
   openExternal: (url: string) => ipcRenderer.invoke(Channels.OPEN_EXTERNAL, url),
+
+  // Update
+  checkForUpdates: () => ipcRenderer.invoke(Channels.UPDATE_CHECK),
+  downloadUpdate: () => ipcRenderer.invoke(Channels.UPDATE_DOWNLOAD),
+  onUpdateStatus: (callback: (info: unknown) => void) => {
+    const listener = (_event: unknown, info: unknown) => callback(info);
+    ipcRenderer.on(Channels.UPDATE_STATUS, listener);
+    return () => ipcRenderer.removeListener(Channels.UPDATE_STATUS, listener);
+  },
 };
 
 contextBridge.exposeInMainWorld('api', api);

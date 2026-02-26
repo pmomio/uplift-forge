@@ -6,6 +6,7 @@ export const Channels = {
   AUTH_LOGOUT: 'auth:logout',
   AUTH_STATE: 'auth:state',
   AUTH_STATE_CHANGED: 'auth:state-changed',
+  AUTH_RESET: 'auth:reset',
 
   // Config
   CONFIG_GET: 'config:get',
@@ -34,6 +35,11 @@ export const Channels = {
 
   // Shell
   OPEN_EXTERNAL: 'shell:open-external',
+
+  // Update
+  UPDATE_CHECK: 'update:check',
+  UPDATE_DOWNLOAD: 'update:download',
+  UPDATE_STATUS: 'update:status',
 } as const;
 
 export type Channel = (typeof Channels)[keyof typeof Channels];

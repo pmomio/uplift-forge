@@ -165,5 +165,14 @@ export interface JiraMember {
 export interface AuthState {
   status: 'loading' | 'authenticated' | 'unauthenticated';
   email?: string;
-  cloudId?: string;
+  baseUrl?: string;
+}
+
+export interface UpdateInfo {
+  currentVersion: string;
+  latestVersion: string | null;
+  updateAvailable: boolean;
+  releaseUrl: string | null;
+  releaseNotes: string | null;
+  downloadUrl: string | null;
 }

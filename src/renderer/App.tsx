@@ -6,8 +6,9 @@ import EngineeringAttribution from './pages/EngineeringAttribution';
 import TeamMetrics from './pages/TeamMetrics';
 import IndividualMetrics from './pages/IndividualMetrics';
 import ConfigPanel from './components/ConfigPanel';
+import UpdateBanner from './components/UpdateBanner';
 import LoginPage from './pages/LoginPage';
-import { getJiraProject, getAuthState } from './api';
+import { getJiraProject, getAuthState, resetApp } from './api';
 import { Loader2 } from 'lucide-react';
 
 export interface ProjectInfo {
@@ -78,6 +79,13 @@ function App() {
     setProject(null);
   }, []);
 
+  const handleReset = useCallback(async () => {
+    await resetApp();
+    setAuthStatus('unauthenticated');
+    setAuthEmail(null);
+    setProject(null);
+  }, []);
+
   // Loading state
   if (authStatus === 'loading') {
     return (
@@ -99,9 +107,9 @@ function App() {
         position="top-center"
         toastOptions={{
           duration: 3000,
-          style: { borderRadius: '10px', fontSize: '13px', fontWeight: 500 },
-          success: { style: { background: '#065f46', color: '#d1fae5', border: '1px solid #047857' } },
-          error: { style: { background: '#7f1d1d', color: '#fecaca', border: '1px solid #991b1b' } },
+          style: { borderRadius: '10px', fontSize: '13px', fontWeight: 500, backdropFilter: 'blur(12px)' },
+          success: { style: { background: 'rgba(6, 95, 70, 0.9)', color: '#d1fae5', border: '1px solid #047857', backdropFilter: 'blur(12px)' } },
+          error: { style: { background: 'rgba(127, 29, 29, 0.9)', color: '#fecaca', border: '1px solid #991b1b', backdropFilter: 'blur(12px)' } },
         }}
       />
 
@@ -112,16 +120,20 @@ function App() {
         project={project}
         email={authEmail}
         onLogout={handleLogout}
+        onReset={handleReset}
       />
 
       {/* Content */}
-      <main className="flex-1 overflow-hidden">
-        {activeTab === 'home' && <HomePage project={project} />}
-        {activeTab === 'attribution' && <EngineeringAttribution refreshKey={refreshKey} project={project} />}
-        {activeTab === 'metrics' && <TeamMetrics refreshKey={refreshKey} project={project} />}
-        {activeTab === 'individual' && <IndividualMetrics refreshKey={refreshKey} project={project} />}
-        {activeTab === 'config' && <ConfigPanel onConfigSaved={handleConfigSaved} />}
-      </main>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <UpdateBanner />
+        <main className="flex-1 overflow-hidden pt-10 animate-fade-in">
+          {activeTab === 'home' && <HomePage project={project} />}
+          {activeTab === 'attribution' && <EngineeringAttribution refreshKey={refreshKey} project={project} />}
+          {activeTab === 'metrics' && <TeamMetrics refreshKey={refreshKey} project={project} />}
+          {activeTab === 'individual' && <IndividualMetrics refreshKey={refreshKey} project={project} />}
+          {activeTab === 'config' && <ConfigPanel onConfigSaved={handleConfigSaved} />}
+        </main>
+      </div>
     </div>
   );
 }
