@@ -35,3 +35,25 @@ sync:
 ticket_filter:
   mode: last_x_months
   months: 6
+tracked_engineers:
+- accountId: 62572abd9e7380006fb365bc
+  avatar: https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/62572abd9e7380006fb365bc/ca7b884e-04ad-4131-a8ea-5ddf4b0f0864/48
+  displayName: Alexander Levin
+- accountId: 618e458297825300689f04e6
+  avatar: https://secure.gravatar.com/avatar/50e1197edd56e3dfebf0273a3ae44321?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FAH-1.png
+  displayName: Adel Hegazy
+- accountId: 712020:56136f78-fe8f-43be-a498-07618888114c
+  avatar: https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/712020:56136f78-fe8f-43be-a498-07618888114c/91822bd5-3913-4c00-9012-b6759fbed967/48
+  displayName: Alina Ipatina
+- accountId: 62bd8f3d228c59d8da1a9c63
+  avatar: https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/62bd8f3d228c59d8da1a9c63/8d6e3bb6-1b2f-46ff-aced-002dc4ef033b/48
+  displayName: Norbert Galambosi
+- accountId: 6166c945c7bea40069b5c86a
+  avatar: https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/6166c945c7bea40069b5c86a/e7072ac8-12b5-4ed0-828a-3db05e2266d3/48
+  displayName: Salma Alkheja
+- accountId: 5d949b3afdfa560dcc3a730f
+  avatar: https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/5d949b3afdfa560dcc3a730f/ab98e074-659d-4bd7-8882-43f9b641596c/48
+  displayName: Srijita Deb
+- accountId: 712020:db84ddfb-30ff-415e-b91f-ddfd39b2f06c
+  avatar: https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/712020:db84ddfb-30ff-415e-b91f-ddfd39b2f06c/211dcd01-4926-46af-908f-e7822393c8d3/48
+  displayName: Vlad Usenko

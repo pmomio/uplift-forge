@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Search, Calculator, Download, Filter, X, TrendingUp, BarChart3, Link, Clock } from 'lucide-react';
+import { Save, Search, Calculator, Download, Filter, X, TrendingUp, BarChart3, Link, Clock, Users, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { getConfig, saveConfig, getJiraFields, getJiraStatuses } from '../api';
+import { getConfig, saveConfig, getJiraFields, getJiraStatuses, getJiraMembers } from '../api';
 import RuleBuilder from './RuleBuilder';
 
 interface ConfigPanelProps {
@@ -31,6 +31,8 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
   const [loadError, setLoadError] = useState(false);
   const [fetchingFields, setFetchingFields] = useState(false);
   const [fieldsFetched, setFieldsFetched] = useState(false);
+  const [jiraMembers, setJiraMembers] = useState<any[]>([]);
+  const [fetchingMembers, setFetchingMembers] = useState(false);
 
   useEffect(() => {
     loadConfig();
@@ -95,7 +97,8 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
         eng_excluded_statuses: config.eng_excluded_statuses || [],
         ticket_filter: config.ticket_filter || { mode: 'last_x_months', months: 6 },
         mapping_rules: config.mapping_rules || { tpd_bu: {}, work_stream: {} },
-        sp_to_days: config.sp_to_days ?? 1
+        sp_to_days: config.sp_to_days ?? 1,
+        tracked_engineers: config.tracked_engineers || [],
       });
       if (result.data.sync_triggered) {
         toast.success(`Config saved — synced ${result.data.ticket_count} tickets`);
@@ -290,6 +293,124 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
                   <span className="text-sm text-slate-300">man-day(s)</span>
                   <span className="text-xs text-slate-500 ml-2">= {((config.sp_to_days ?? 1) * 8).toFixed(0)}h per SP</span>
                 </div>
+              </section>
+            </div>
+
+            {/* Divider */}
+            <div className="border-t border-slate-700/30" />
+
+            {/* ═══════════════════════════════════════════════
+                SECTION 2b: INDIVIDUAL METRICS
+                ═══════════════════════════════════════════════ */}
+            <div className="space-y-4">
+              <FeatureHeader
+                icon={<Users size={16} className="text-white" />}
+                title="Individual Metrics"
+                description="Track per-engineer KPIs. Select team members to include in individual dashboards."
+                color="bg-orange-500"
+              />
+
+              <section className="bg-orange-500/8 p-4 rounded-lg border border-orange-500/20">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-semibold text-orange-300 uppercase tracking-wider flex items-center gap-2">
+                    <Users size={14} />
+                    Tracked Engineers
+                  </h3>
+                  <button
+                    onClick={async () => {
+                      if (!config?.project_key?.trim()) {
+                        toast.error('Enter a Project Key first', { id: 'members-err' });
+                        return;
+                      }
+                      setFetchingMembers(true);
+                      try {
+                        const res = await getJiraMembers();
+                        if (res.data.error) {
+                          toast.error('Failed to fetch members: ' + res.data.error, { id: 'members-err' });
+                        } else {
+                          setJiraMembers(res.data);
+                          toast.success(`Found ${res.data.length} team members`, { id: 'members-ok' });
+                        }
+                      } catch {
+                        toast.error('Failed to fetch JIRA members', { id: 'members-err' });
+                      } finally {
+                        setFetchingMembers(false);
+                      }
+                    }}
+                    disabled={fetchingMembers || !config?.project_key?.trim()}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-300 hover:text-orange-200 bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/20 px-3 py-1.5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Download size={13} className={fetchingMembers ? 'animate-pulse' : ''} />
+                    {fetchingMembers ? 'Fetching...' : 'Fetch Members'}
+                  </button>
+                </div>
+
+                {/* Selected engineers chips */}
+                {(config.tracked_engineers || []).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {(config.tracked_engineers || []).map((eng: any) => (
+                      <span key={eng.accountId} className="bg-orange-500/15 border border-orange-500/30 text-orange-300 px-2 py-0.5 rounded text-xs flex items-center gap-1.5 group">
+                        {eng.avatar && <img src={eng.avatar} alt="" className="w-4 h-4 rounded-full" />}
+                        {eng.displayName}
+                        <button
+                          onClick={() => setConfig({
+                            ...config,
+                            tracked_engineers: (config.tracked_engineers || []).filter((e: any) => e.accountId !== eng.accountId)
+                          })}
+                          className="text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X size={11} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Member list (shown after fetch) */}
+                {jiraMembers.length > 0 ? (
+                  <div className="max-h-52 overflow-y-auto rounded-md border border-slate-700/50 divide-y divide-slate-700/30">
+                    {jiraMembers.filter(m => m.active).map((member: any) => {
+                      const isTracked = (config.tracked_engineers || []).some((e: any) => e.accountId === member.accountId);
+                      return (
+                        <button
+                          key={member.accountId}
+                          onClick={() => {
+                            if (isTracked) {
+                              setConfig({
+                                ...config,
+                                tracked_engineers: (config.tracked_engineers || []).filter((e: any) => e.accountId !== member.accountId)
+                              });
+                            } else {
+                              setConfig({
+                                ...config,
+                                tracked_engineers: [...(config.tracked_engineers || []), {
+                                  accountId: member.accountId,
+                                  displayName: member.displayName,
+                                  avatar: member.avatar,
+                                }]
+                              });
+                            }
+                          }}
+                          className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors ${
+                            isTracked
+                              ? 'bg-orange-500/10 text-orange-200'
+                              : 'hover:bg-slate-700/30 text-slate-300'
+                          }`}
+                        >
+                          {member.avatar && <img src={member.avatar} alt="" className="w-6 h-6 rounded-full flex-shrink-0" />}
+                          <span className="text-sm flex-1 truncate">{member.displayName}</span>
+                          {isTracked && <Check size={14} className="text-orange-400 flex-shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-500 italic text-center py-2">
+                    {(config.tracked_engineers || []).length > 0
+                      ? 'Click "Fetch Members" to modify the selection.'
+                      : 'Sync tickets first, then click "Fetch Members" to see engineers who have worked on this project.'}
+                  </p>
+                )}
               </section>
             </div>
 

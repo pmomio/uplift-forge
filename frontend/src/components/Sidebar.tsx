@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, BarChart3, Flame, Home, TrendingUp } from 'lucide-react';
+import { Settings, BarChart3, Flame, Home, TrendingUp, Users } from 'lucide-react';
 import type { ProjectInfo } from '../App';
 
 export interface Tab {
@@ -12,6 +12,7 @@ export const TABS: Tab[] = [
   { id: 'home', label: 'Home', icon: <Home size={18} /> },
   { id: 'attribution', label: 'Eng. Attribution', icon: <BarChart3 size={18} /> },
   { id: 'metrics', label: 'Team Metrics', icon: <TrendingUp size={18} /> },
+  { id: 'individual', label: 'Individual Metrics', icon: <Users size={18} /> },
   { id: 'config', label: 'Configuration', icon: <Settings size={18} /> },
 ];
 

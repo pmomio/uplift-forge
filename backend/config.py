@@ -33,6 +33,9 @@ class Config:
         # Story point calibration: how many man-days = 1 SP (default 1)
         self.sp_to_days = self.data.get("sp_to_days", 1)
 
+        # Tracked engineers for individual KPIs
+        self.tracked_engineers = self.data.get("tracked_engineers", [])
+
         # JIRA Custom Field IDs
         self.field_ids = self.data["jira"].get("field_ids", {
             "tpd_bu": "customfield_12345",
@@ -66,7 +69,8 @@ class Config:
 
     def update_config(self, project_key=None, field_ids=None, eng_start=None,
                       eng_end=None, eng_excluded_statuses=None, ticket_filter=None,
-                      mapping_rules=None, sp_to_days=None, **_ignored):
+                      mapping_rules=None, sp_to_days=None, tracked_engineers=None,
+                      **_ignored):
         if project_key:
             self.project_key = project_key
             self.data["jira"]["project_key"] = project_key
@@ -101,6 +105,10 @@ class Config:
         if sp_to_days is not None:
             self.sp_to_days = float(sp_to_days)
             self.data["sp_to_days"] = self.sp_to_days
+
+        if tracked_engineers is not None:
+            self.tracked_engineers = tracked_engineers
+            self.data["tracked_engineers"] = tracked_engineers
 
         # Save to file
         with open(self.config_path, "w") as f:
