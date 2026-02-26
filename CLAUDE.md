@@ -46,9 +46,6 @@ frontend/          React 19 + TypeScript + Vite 7
       EngineeringAttribution.tsx  Ticket-level field management
       __tests__/                  Page test files
   vite.config.ts   Build + test config with coverage thresholds
-.github/
-  workflows/
-    test.yml       CI: runs backend + frontend tests on every PR
 ```
 
 ## Development Commands
@@ -86,7 +83,6 @@ Or via Makefile: `make test`
 
 - **Backend:** pytest-cov with `--cov-fail-under=90` (currently ~99%)
 - **Frontend:** @vitest/coverage-v8 with thresholds `{ statements: 90, branches: 80, functions: 85, lines: 90 }` (currently ~96%)
-- **CI:** GitHub Actions runs both test suites on every PR to `main`. PRs that drop coverage below thresholds will fail CI.
 
 When adding new features or modifying existing code:
 1. Write tests for all new code paths (happy path + error handling).
