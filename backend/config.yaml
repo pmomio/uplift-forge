@@ -36,12 +36,12 @@ ticket_filter:
   mode: last_x_months
   months: 6
 tracked_engineers:
-- accountId: 62572abd9e7380006fb365bc
-  avatar: https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/62572abd9e7380006fb365bc/ca7b884e-04ad-4131-a8ea-5ddf4b0f0864/48
-  displayName: Alexander Levin
 - accountId: 618e458297825300689f04e6
   avatar: https://secure.gravatar.com/avatar/50e1197edd56e3dfebf0273a3ae44321?d=https%3A%2F%2Favatar-management--avatars.us-west-2.prod.public.atl-paas.net%2Finitials%2FAH-1.png
   displayName: Adel Hegazy
+- accountId: 62572abd9e7380006fb365bc
+  avatar: https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/62572abd9e7380006fb365bc/ca7b884e-04ad-4131-a8ea-5ddf4b0f0864/48
+  displayName: Alexander Levin
 - accountId: 712020:56136f78-fe8f-43be-a498-07618888114c
   avatar: https://avatar-management--avatars.us-west-2.prod.public.atl-paas.net/712020:56136f78-fe8f-43be-a498-07618888114c/91822bd5-3913-4c00-9012-b6759fbed967/48
   displayName: Alina Ipatina
