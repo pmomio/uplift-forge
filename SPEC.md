@@ -1,6 +1,6 @@
 # Uplift Forge — Technical Specification
 
-**Version:** 4.0
+**Version:** 5.0
 **Team:** ACTIN
 **Organisation:** Omio
 **Date:** February 2026
@@ -8,7 +8,7 @@
 ---
 
 ## 1. Overview
-Uplift Forge is a Python + React platform for engineering team performance. It connects to JIRA to auto-compute engineering hours, map business metadata via a rule engine, track team-level KPIs with trend analysis, and provide a personalized dashboard using JIRA project metadata.
+Uplift Forge is a Python + React platform for engineering team performance. It connects to JIRA to auto-compute engineering hours, map business metadata via a rule engine, track team-level and individual-level KPIs with trend analysis, and provide a personalized dashboard using JIRA project metadata.
 
 ## 2. Architecture & Tech Stack
 
@@ -19,19 +19,22 @@ Uplift Forge is a Python + React platform for engineering team performance. It c
 - **Persistence:** `config.yaml` for settings/mappings, in-memory caches for tickets and raw issues
 - **Sync:** On-demand only — triggered by explicit user actions (Sync button or config save). No background scheduler.
 - **Logging:** Python `logging` module
+- **Testing:** pytest + pytest-cov (188 tests, ~99% coverage)
 
 ### Frontend (React 19 + TypeScript)
 - **Build Tool:** Vite 7
-- **Styling:** Tailwind CSS v4 — dark slate theme with indigo/cyan/violet/emerald accents per feature
+- **Styling:** Tailwind CSS v4 — dark slate theme with indigo/cyan/violet/emerald/orange accents per feature
 - **Charts:** Recharts (LineChart, BarChart, PieChart)
 - **Icons:** Lucide React
 - **HTTP Client:** Axios
 - **Notifications:** react-hot-toast (with ID-based deduplication)
 - **Dialogs:** Custom `ModalDialog` component (no native `alert`/`confirm`/`prompt`)
+- **Testing:** vitest + @testing-library/react + @vitest/coverage-v8 (257 tests, ~96% coverage)
 
 ### Infrastructure
 - **Containerisation:** Docker Compose (backend + frontend)
 - **Dev tooling:** Makefile for common commands
+- **CI:** GitHub Actions — runs backend + frontend tests on every PR to `main`
 
 ## 3. Core Features
 
@@ -52,6 +55,8 @@ The Configuration page groups settings by feature with visual section headers:
 **Engineering Attribution** — TPD BU / Eng Hours / Work Stream field mappings, "show only missing fields" toggle, TPD BU and Work Stream mapping rules.
 
 **Engineering Hours Calculation** (shared) — Start/end statuses, excluded statuses for eng hours computation.
+
+**Individual Metrics** — Tracked engineers selection from JIRA project members. Fetch Members button to load available team members, toggle selection on/off.
 
 All configuration persisted to `config.yaml`.
 
@@ -97,7 +102,36 @@ Every KPI card and chart section has a `?` icon. Hover shows:
 - High-performing targets
 - What up-trend and down-trend mean for this specific metric
 
-### 3.4 Field Computation Engine
+### 3.4 Individual Metrics Dashboard
+
+#### Per-Engineer KPI Cards
+Each tracked engineer gets a collapsible card showing:
+| Metric | Description | Lower is Better? |
+|--------|-------------|:-:|
+| Tickets | Total resolved tickets | |
+| Story Points | Sum of SP | |
+| Eng Hours | Sum of engineering hours | |
+| Cycle Time | Average eng hours per ticket | Yes |
+| Hours / SP | Average eng hours per story point | Yes |
+| Estimation Accuracy | (SP x sp_to_days x 8) / eng hours | |
+| Bug Ratio | Bug tickets / total tickets | Yes |
+| Complexity | Average story points per ticket | |
+| Focus Ratio | Tickets with eng hours / total tickets | |
+
+#### Expand/Collapse Detail
+Clicking an engineer card reveals:
+- **vs Team Average** comparison for each KPI
+- **Ratios & Quality** section with bug ratio, complexity, and focus ratio
+- Trend badges (when using time-bounded periods)
+- Help tooltips on each metric
+
+#### Team Comparison Chart
+Bar chart comparing all tracked engineers on story points, eng hours, and tickets.
+
+#### Team Average Row
+Summary row showing averaged metrics across all tracked engineers.
+
+### 3.5 Field Computation Engine
 
 #### Engineering Hours
 Calculated from the issue changelog:
@@ -136,21 +170,22 @@ Resolved by evaluating mapping rules against issue context:
 ```
 This means: match B2C if `(parent_key = ACTIN-195 AND labels contains B2C) OR (summary contains consumer)`.
 
-### 3.5 Sync Engine
+### 3.6 Sync Engine
 - **Bulk Sync:** Cursor-based pagination with embedded changelogs (no N+1 API calls). Time range capped at 12 months.
 - **Single-ticket Sync:** Per-row refresh fetches and reprocesses one ticket.
 - **On-demand only:** No background scheduler. Sync triggers via "Sync Now" / "Sync & Refresh" buttons or config save (when project key or filter changes).
 - **Raw Issue Cache:** Stores full JIRA issue payloads so mapping rules can be re-evaluated without re-fetching from JIRA.
 
-### 3.6 Engineering Attribution Dashboard
+### 3.7 Engineering Attribution Dashboard
 - **Filtering:** Shows only final-state tickets (Done, Rejected, Closed, Resolved, Cancelled).
 - **Sorting:** By JIRA `updated` timestamp, newest first.
 - **Pagination:** 10 items per page with previous/next navigation.
 - **Inline Editing:** TPD BU (dropdown), Work Stream (dropdown), and Engineering Hours (number input) are editable per row.
 - **Per-field Recalculate:** Calculator buttons for each field to recompute from JIRA data on demand.
+- **Bulk actions:** Calculate All (hours + fields) and Save All buttons for batch operations across visible dirty/computed tickets.
 - **Save to JIRA:** Pushes local edits back to JIRA custom fields (toast deduplication via IDs).
 - **Status Badges:** Color-coded by ticket status.
-- **Summary Bar:** Shows total ticket count and breakdown of missing fields.
+- **Summary Bar:** Shows total ticket count and breakdown of missing fields with clickable filter buttons.
 
 ## 4. API Endpoints
 
@@ -167,7 +202,9 @@ This means: match B2C if `(parent_key = ACTIN-195 AND labels contains B2C) OR (s
 | `GET` | `/jira/project` | Get project name, lead, and avatar from JIRA |
 | `GET` | `/jira/fields` | List all JIRA custom fields |
 | `GET` | `/jira/statuses` | List all JIRA workflow statuses |
+| `GET` | `/jira/members` | List JIRA project members (active users) |
 | `GET` | `/metrics/team?period=` | Team KPIs with trend data (`all`, `weekly`, `bi-weekly`, `monthly`) |
+| `GET` | `/metrics/individual?period=` | Per-engineer KPIs with team averages (`all`, `weekly`, `bi-weekly`, `monthly`) |
 
 ### POST /config behavior
 - Changing **project key** or **ticket filter** triggers a full JIRA re-sync.
@@ -176,6 +213,9 @@ This means: match B2C if `(parent_key = ACTIN-195 AND labels contains B2C) OR (s
 
 ### GET /metrics/team response
 Returns `summary`, `by_business_unit`, `by_work_stream`, `issue_type_breakdown`, `monthly_trend`, plus `prev_*` variants for trend calculation when `period != all`.
+
+### GET /metrics/individual response
+Returns `engineers` (array of per-engineer metrics with `prev_metrics`), `team_averages`, `prev_team_averages`, and `period`.
 
 ## 5. Configuration Schema (`config.yaml`)
 
@@ -204,6 +244,11 @@ mapping_rules:
   tpd_bu: { ... }
   work_stream: { ... }
 
+tracked_engineers:
+  - accountId: "abc123"
+    displayName: "Alice Dev"
+    avatar: "https://..."
+
 office_hours:
   start: "09:00"
   end: "18:00"
@@ -217,11 +262,45 @@ sync:
 
 ## 6. Testing
 
-Backend tests across two files:
-- **`test_field_engine.py`** — Office hours calculation, blocked periods, weekend exclusion.
-- **`test_integration.py`** — JQL construction, sync filter passthrough, GET /tickets filtering, missing fields edge cases, config endpoint behavior, rule engine AND/OR logic with backward compatibility.
+The project maintains **>90% test coverage** across both backend and frontend, enforced by CI on every PR.
 
-Run: `make test` or `cd backend && .venv/bin/python -m pytest -v`
+### Backend (188 tests, ~99% coverage)
+- **`conftest.py`** — Shared fixtures, config.yaml save/restore
+- **`test_field_engine.py`** — Office hours calculation, blocked periods, weekend exclusion, operator logic, field mapping
+- **`test_integration.py`** — JQL construction, sync filter passthrough, GET /tickets filtering, missing fields edge cases, config endpoint behavior, rule engine AND/OR logic with backward compatibility
+- **`test_config.py`** — Config module loading, persistence, defaults
+- **`test_jira_client.py`** — JIRA API wrapper, pagination, error handling
+- **`test_main.py`** — App entrypoint, CORS, router registration
+- **`test_routes_tickets.py`** — Ticket CRUD, sync, metrics endpoints, error cases
+- **`test_routes_config.py`** — Config GET/POST, JIRA field/status/member listing
+
+Run: `make test-backend` or `cd backend && .venv/bin/pytest --tb=short -q`
+
+### Frontend (257 tests, ~96% coverage)
+- **`App.test.tsx`** — Tab navigation, project fetch, config save callback
+- **`api.test.ts`** — All API function shapes
+- **`ConfigPanel.test.tsx`** (51 tests) — All config sections, field fetch, save, members, status selects, rule builders
+- **`TicketTable.test.tsx`** (53 tests) — Rendering, filtering, sorting, editing, save, sync, calculate, bulk actions, pagination
+- **`RuleBuilder.test.tsx`** (26 tests) — Groups, AND/OR blocks, adding/removing rules, color themes
+- **`TeamMetrics.test.tsx`** (29 tests) — KPI cards, charts, trends, tooltips, sync, empty states
+- **`IndividualMetrics.test.tsx`** (21 tests) — Engineer cards, expand/collapse, trend badges, team comparison
+- **`EngineeringAttribution.test.tsx`** (13 tests) — Fetch, sync, error handling, empty states
+- Plus tests for ModalDialog, Sidebar, TicketSummary, HomePage
+
+Run: `make test-frontend` or `cd frontend && npx vitest run`
+
+### Coverage Thresholds
+| Suite | Statements | Branches | Functions | Lines |
+|-------|-----------|----------|-----------|-------|
+| Backend | 90% (fail-under) | — | — | — |
+| Frontend | 90% | 80% | 85% | 90% |
+
+### CI Pipeline
+GitHub Actions (`.github/workflows/test.yml`) runs on every PR to `main`:
+1. **Backend job:** Python 3.11 setup, pip install, `pytest`
+2. **Frontend job:** Node 20 setup, npm ci, `tsc --noEmit`, `vitest run --coverage`
+
+Both jobs must pass for PRs to be merged.
 
 ## 7. Security
 - JIRA API token and email managed via `.env` environment variables (never committed).
