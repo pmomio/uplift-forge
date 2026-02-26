@@ -34,7 +34,6 @@ Uplift Forge is a Python + React platform for engineering team performance. It c
 ### Infrastructure
 - **Containerisation:** Docker Compose (backend + frontend)
 - **Dev tooling:** Makefile for common commands
-- **CI:** GitHub Actions — runs backend + frontend tests on every PR to `main`
 
 ## 3. Core Features
 
@@ -262,7 +261,7 @@ sync:
 
 ## 6. Testing
 
-The project maintains **>90% test coverage** across both backend and frontend, enforced by CI on every PR.
+The project maintains **>90% test coverage** across both backend and frontend.
 
 ### Backend (188 tests, ~99% coverage)
 - **`conftest.py`** — Shared fixtures, config.yaml save/restore
@@ -294,13 +293,6 @@ Run: `make test-frontend` or `cd frontend && npx vitest run`
 |-------|-----------|----------|-----------|-------|
 | Backend | 90% (fail-under) | — | — | — |
 | Frontend | 90% | 80% | 85% | 90% |
-
-### CI Pipeline
-GitHub Actions (`.github/workflows/test.yml`) runs on every PR to `main`:
-1. **Backend job:** Python 3.11 setup, pip install, `pytest`
-2. **Frontend job:** Node 20 setup, npm ci, `tsc --noEmit`, `vitest run --coverage`
-
-Both jobs must pass for PRs to be merged.
 
 ## 7. Security
 - JIRA API token and email managed via `.env` environment variables (never committed).

@@ -99,7 +99,7 @@ make run-frontend  # Vite dev server on :5173
 
 ## Testing
 
-The project maintains **>90% test coverage** enforced by CI on every pull request.
+The project maintains **>90% test coverage**.
 
 | Suite | Tests | Coverage | Tool |
 |-------|------:|----------|------|
@@ -110,11 +110,9 @@ The project maintains **>90% test coverage** enforced by CI on every pull reques
 Coverage thresholds are enforced automatically:
 - **Backend:** `--cov-fail-under=90` in `pytest.ini`
 - **Frontend:** `{ statements: 90, branches: 80, functions: 85, lines: 90 }` in `vite.config.ts`
-- **CI:** GitHub Actions runs both suites on every PR to `main`
 
 ## Tech Stack
 
 - **Backend:** FastAPI, `atlassian-python-api`, PyYAML, pytest
 - **Frontend:** React 19, TypeScript, Tailwind CSS v4, Recharts, Lucide React, react-hot-toast, vitest
-- **CI:** GitHub Actions
 - **Infrastructure:** Docker Compose, Makefile
