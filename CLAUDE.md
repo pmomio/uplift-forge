@@ -2,13 +2,13 @@
 
 ## Project Overview
 
-Uplift Forge — an Electron desktop app for engineering team performance. Connects to JIRA via Atlassian OAuth 2.0 SSO to auto-compute engineering hours, map business metadata via a rule engine, and track team & individual KPIs with trend analysis. No Python, no `.env`, no manual config — users install, sign in, and go.
+Uplift Forge — an Electron desktop app for engineering team performance. Connects to JIRA via API token (Basic auth) to auto-compute engineering hours, map business metadata via a rule engine, and track team & individual KPIs with trend analysis. No Python, no `.env`, no manual config — users install, enter their JIRA base URL + email + API token, and go.
 
 ## Architecture
 
 - **Runtime**: Electron (main process = Node.js/TypeScript backend, renderer = React frontend)
 - **Frontend-Backend**: Electron IPC (no HTTP server)
-- **Auth**: Atlassian OAuth 2.0 (3LO) — tokens encrypted via `safeStorage` (OS Keychain)
+- **Auth**: JIRA API token (Basic auth) — credentials encrypted via `safeStorage` (OS Keychain)
 - **Persistence**: `electron-store` JSON files in OS app data directory
 - **Packaging**: electron-forge (.dmg for Mac, .exe for Windows)
 - **Timezone math**: luxon library
@@ -33,12 +33,11 @@ uplift-forge/
       preload.ts                  # contextBridge API exposure
 
       auth/
-        oauth.ts                  # Atlassian OAuth 2.0 (3LO) flow
-        token-store.ts            # Encrypted token storage (safeStorage + electron-store)
+        token-store.ts            # Encrypted credential storage (safeStorage + electron-store)
 
       services/
         config.service.ts         # electron-store config
-        jira.service.ts           # JIRA REST API v3 with OAuth Bearer tokens
+        jira.service.ts           # JIRA REST API v3 with Basic auth (API token)
         field-engine.service.ts   # Office hours calc + rule engine
         ticket.service.ts         # Cache mgmt, sync, processIssue
         metrics.service.ts        # Team + individual KPIs
@@ -96,8 +95,8 @@ npm run test:coverage       # With coverage report
 ## Key Technical Decisions
 
 - **Electron IPC**: All frontend-backend communication via `ipcMain.handle()` / `ipcRenderer.invoke()`. No HTTP server.
-- **Atlassian OAuth 2.0**: Tokens stored encrypted via `safeStorage`. Auto-refresh on expiry.
-- **JIRA Cloud REST API v3**: Uses `https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/...` with Bearer tokens. Pagination uses `nextPageToken`/`isLast`.
+- **JIRA API Token Auth**: Credentials (baseUrl, email, apiToken) stored encrypted via `safeStorage`. Basic auth header sent with each request.
+- **JIRA REST API v3**: Uses `{baseUrl}/rest/api/3/...` with Basic auth. Pagination uses `nextPageToken`/`isLast`.
 - **Absolute dates in JQL**: This JIRA instance silently returns 0 results for relative dates.
 - **12-month data cap**: Time range capped at 12 months. Legacy `mode: "all"` treated as 12 months.
 - **Rule engine data model**: `Rule[][]` per group — inner arrays are AND-blocks, outer array OR's them. Old flat `Rule[]` format auto-detected.
@@ -117,12 +116,12 @@ npm run test:coverage       # With coverage report
 - Timezone: luxon (DateTime, setZone)
 - Commit style: imperative mood, concise summary line
 
-## Environment Variables
+## Authentication
 
-```
-ATLASSIAN_CLIENT_ID=      # OAuth app Client ID (from Atlassian Developer Console)
-ATLASSIAN_CLIENT_SECRET=  # OAuth app Client Secret
-```
+No environment variables needed. On first launch, the app prompts for JIRA base URL, email, and API token, which are stored encrypted via `safeStorage` in `electron-store`. Sessions persist across restarts.
+
+- **Sign out**: Clears stored credentials — user must re-enter them to sign in again.
+- **Reset App**: Same as sign out (clears all credentials).
 
 ## Things to Watch Out For
 

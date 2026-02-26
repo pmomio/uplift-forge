@@ -299,7 +299,7 @@ const TicketTable: React.FC<TicketTableProps> = ({ tickets, onUpdate, missingFil
   return (
     <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden shadow-xl shadow-black/20">
       {/* Toolbar */}
-      <div className="px-4 py-2 border-b border-slate-700/40 flex items-center justify-between bg-slate-800/60">
+      <div className="px-4 py-2.5 border-b border-slate-700/40 flex items-center justify-between bg-slate-800/60">
         <span className="text-xs text-slate-500">
           {sortedTickets.length} ticket{sortedTickets.length !== 1 ? 's' : ''}
           {missingFilter && ` (filtered from ${tickets.length})`}
@@ -364,7 +364,7 @@ const TicketTable: React.FC<TicketTableProps> = ({ tickets, onUpdate, missingFil
                 <th
                   key={col.key}
                   onClick={() => handleSort(col.key)}
-                  className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer select-none hover:text-slate-200 transition-colors"
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer select-none hover:text-slate-200 hover:bg-slate-700/30 transition-colors duration-150"
                 >
                   <span className="inline-flex items-center gap-1">
                     {col.label}
@@ -403,7 +403,7 @@ const TicketTable: React.FC<TicketTableProps> = ({ tickets, onUpdate, missingFil
                   : 'bg-slate-700/15';
 
               return (
-                <tr key={ticket.key} className={`${rowBg} hover:bg-indigo-500/8 transition-colors`}>
+                <tr key={ticket.key} className={`${rowBg} hover:bg-indigo-500/8 transition-colors duration-150`}>
                   {/* Key */}
                   <td className="px-4 py-2.5 whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
@@ -547,7 +547,7 @@ const TicketTable: React.FC<TicketTableProps> = ({ tickets, onUpdate, missingFil
           <button
             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
-            className="px-3 py-1.5 text-sm font-medium text-slate-300 bg-slate-700/50 border border-slate-600/50 rounded-md hover:bg-slate-700 active:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1.5 text-sm font-medium text-slate-300 bg-slate-700/50 border border-slate-600/50 rounded-md hover:bg-slate-700 hover:border-slate-500/50 active:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
           >
             Previous
           </button>
@@ -557,7 +557,7 @@ const TicketTable: React.FC<TicketTableProps> = ({ tickets, onUpdate, missingFil
           <button
             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages}
-            className="px-3 py-1.5 text-sm font-medium text-slate-300 bg-slate-700/50 border border-slate-600/50 rounded-md hover:bg-slate-700 active:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1.5 text-sm font-medium text-slate-300 bg-slate-700/50 border border-slate-600/50 rounded-md hover:bg-slate-700 hover:border-slate-500/50 active:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
           >
             Next
           </button>

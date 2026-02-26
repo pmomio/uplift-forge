@@ -4,3 +4,16 @@
   padding: 0;
   text-align: left;
 }
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.glass-card {
+  background: rgba(30, 41, 59, 0.5);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(51, 65, 85, 0.4);
+  border-radius: 0.75rem;
+}
+

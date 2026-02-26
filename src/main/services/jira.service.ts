@@ -1,53 +1,31 @@
-import { getAccessToken, getCloudId } from '../auth/token-store.js';
+import { getAuthHeader, getBaseUrl } from '../auth/token-store.js';
 import type { JiraField, JiraStatus, JiraMember, ProjectInfo } from '../../shared/types.js';
 
 /**
- * Port of backend/jira_client.py — JIRA REST API v3 with OAuth Bearer tokens.
+ * JIRA REST API v3 with Basic auth (email + API token).
  *
- * Uses Atlassian Cloud REST API via:
- *   https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/...
+ * Uses the user-provided base URL:
+ *   {baseUrl}/rest/api/3/...
  */
 
 async function jiraFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  const token = await getAccessToken();
-  const cloudId = getCloudId();
-  if (!token || !cloudId) {
-    throw new Error('Not authenticated — no access token or cloudId');
+  const authHeader = getAuthHeader();
+  const baseUrl = getBaseUrl();
+  if (!authHeader || !baseUrl) {
+    throw new Error('Not authenticated — no credentials configured');
   }
 
-  const baseUrl = `https://api.atlassian.com/ex/jira/${cloudId}/rest/api/3`;
-  const url = `${baseUrl}${path}`;
+  const url = `${baseUrl}/rest/api/3${path}`;
 
   const response = await fetch(url, {
     ...options,
     headers: {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': authHeader,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       ...options.headers,
     },
   });
-
-  if (response.status === 401) {
-    // Try refreshing token and retry once
-    const newToken = await getAccessToken(true);
-    if (!newToken) throw new Error('Authentication expired — please log in again');
-
-    const retryResponse = await fetch(url, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${newToken}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...options.headers,
-      },
-    });
-
-    if (!retryResponse.ok) {
-      throw new Error(`JIRA API error ${retryResponse.status}: ${await retryResponse.text()}`);
-    }
-    return retryResponse;
-  }
 
   if (!response.ok) {
     throw new Error(`JIRA API error ${response.status}: ${await response.text()}`);
@@ -86,15 +64,15 @@ export async function getIssues(projectKey: string, months?: number): Promise<un
   while (true) {
     const params = new URLSearchParams({
       jql,
+      fields: '*all',
       expand: 'changelog',
       maxResults: String(batchSize),
     });
     if (nextToken) params.set('nextPageToken', nextToken);
 
-    const response = await jiraFetch(`/search?${params.toString()}`);
+    const response = await jiraFetch(`/search/jql?${params.toString()}`);
     const result = await response.json() as {
       issues?: unknown[];
-      isLast?: boolean;
       nextPageToken?: string;
     };
 
@@ -102,9 +80,8 @@ export async function getIssues(projectKey: string, months?: number): Promise<un
     allIssues.push(...issues);
     console.log(`[JIRA] Fetched batch: ${issues.length} issues (total: ${allIssues.length})`);
 
-    if (result.isLast !== false || issues.length === 0) break;
+    if (issues.length === 0 || !result.nextPageToken) break;
     nextToken = result.nextPageToken;
-    if (!nextToken) break;
   }
 
   return allIssues;
@@ -142,8 +119,8 @@ export async function getIssueWithChangelog(issueKey: string): Promise<Record<st
  * Search issues by JQL (without changelog, for single-ticket lookups).
  */
 export async function searchIssues(jql: string): Promise<unknown[]> {
-  const params = new URLSearchParams({ jql, expand: 'changelog', maxResults: '10' });
-  const response = await jiraFetch(`/search?${params.toString()}`);
+  const params = new URLSearchParams({ jql, fields: '*all', expand: 'changelog', maxResults: '10' });
+  const response = await jiraFetch(`/search/jql?${params.toString()}`);
   const result = await response.json() as { issues?: unknown[] };
   return result.issues ?? [];
 }

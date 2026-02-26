@@ -243,8 +243,8 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
                 onClick={() => handlePeriodChange(p.value)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                   period === p.value
-                    ? 'bg-indigo-500 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-indigo-500 text-white shadow-sm shadow-indigo-500/25'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
                 }`}
               >
                 {p.label}
@@ -263,7 +263,7 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6 animate-fade-in">
         {loading && !metrics ? (
           <div className="flex flex-col justify-center items-center h-64 gap-3">
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-slate-600 border-t-indigo-400" />
@@ -542,13 +542,13 @@ const SectionTrendBadge = ({ trend, label, currentVal, prevVal }: {
 const KpiCard = ({ label, value, suffix, helpKey, trendKey, prev, color }: {
   label: string; value: any; suffix?: string; helpKey: string; trendKey: string; prev?: number | null; color?: string;
 }) => (
-  <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex flex-col gap-1">
+  <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex flex-col gap-1 hover:bg-slate-800/70 hover:border-slate-600/50 hover:shadow-lg hover:shadow-black/10 transition-all duration-200">
     <span className="text-xs font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
       {label}
       <HelpTooltip helpKey={helpKey} />
     </span>
     <div className="flex items-end gap-2">
-      <span className={`text-2xl font-bold tabular-nums ${color || 'text-slate-100'}`}>
+      <span className={`text-2xl font-bold tabular-nums leading-none ${color || 'text-slate-100'}`}>
         {value === null || value === undefined ? '\u2014' : `${value}${suffix || ''}`}
       </span>
       <TrendBadge trendKey={trendKey} current={value} prev={prev} suffix={suffix} />
@@ -564,7 +564,7 @@ const Section = ({ title, helpKey, trend, trendLabel, trendCurrentVal, trendPrev
   trendCurrentVal?: number;
   trendPrevVal?: number;
 }) => (
-  <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
+  <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 hover:border-slate-600/50 transition-colors duration-200">
     <h3 className="text-sm font-semibold text-slate-200 mb-4 uppercase tracking-wider flex items-center gap-2">
       {title}
       <HelpTooltip helpKey={helpKey} />

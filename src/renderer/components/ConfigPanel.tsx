@@ -13,7 +13,7 @@ const FeatureHeader = ({ icon, title, description, color }: {
   icon: React.ReactNode; title: string; description: string; color: string;
 }) => (
   <div className="flex items-start gap-3 pt-2 pb-1">
-    <div className={`w-8 h-8 rounded-lg ${color} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+    <div className={`w-8 h-8 rounded-lg ${color} flex items-center justify-center flex-shrink-0 mt-0.5 shadow-md shadow-black/20`}>
       {icon}
     </div>
     <div>
@@ -168,7 +168,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
         <button
           onClick={handleSave}
           disabled={loading || !config}
-          className="inline-flex items-center gap-2 bg-indigo-500 hover:bg-indigo-400 active:bg-indigo-600 text-white text-sm font-medium px-5 py-2 rounded-lg shadow-md shadow-indigo-500/20 disabled:opacity-50 transition-all"
+          className="inline-flex items-center gap-2 bg-indigo-500 hover:bg-indigo-400 active:bg-indigo-600 text-white text-sm font-medium px-5 py-2 rounded-lg shadow-md shadow-indigo-500/25 hover:shadow-lg hover:shadow-indigo-500/30 disabled:opacity-50 transition-all"
         >
           <Save size={16} />
           <span>{loading ? 'Saving...' : 'Save Configuration'}</span>
@@ -176,7 +176,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6 animate-fade-in">
         {config ? (
           <div className="max-w-4xl space-y-8">
 
@@ -244,7 +244,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
             </div>
 
             {/* Divider */}
-            <div className="border-t border-slate-700/30" />
+            <div className="border-t border-slate-700/20 my-2" />
 
             {/* ═══════════════════════════════════════════════
                 SECTION 2: TEAM METRICS
@@ -297,7 +297,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
             </div>
 
             {/* Divider */}
-            <div className="border-t border-slate-700/30" />
+            <div className="border-t border-slate-700/20 my-2" />
 
             {/* ═══════════════════════════════════════════════
                 SECTION 2b: INDIVIDUAL METRICS
@@ -415,7 +415,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
             </div>
 
             {/* Divider */}
-            <div className="border-t border-slate-700/30" />
+            <div className="border-t border-slate-700/20 my-2" />
 
             {/* ═══════════════════════════════════════════════
                 SECTION 3: ENGINEERING ATTRIBUTION
@@ -465,8 +465,8 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
                         }
                       })}
                     />
-                    <div className="w-9 h-5 bg-slate-700 rounded-full peer-checked:bg-violet-500 transition-colors" />
-                    <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-slate-300 rounded-full peer-checked:translate-x-4 peer-checked:bg-white transition-transform" />
+                    <div className="w-9 h-5 bg-slate-700 rounded-full peer-checked:bg-violet-500 peer-checked:shadow-sm peer-checked:shadow-violet-500/25 transition-colors" />
+                    <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-slate-300 rounded-full shadow-sm peer-checked:translate-x-4 peer-checked:bg-white transition-transform" />
                   </div>
                   <div>
                     <span className="text-sm text-slate-200 group-hover:text-slate-100">Show only tickets with missing fields</span>
@@ -495,7 +495,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
             </div>
 
             {/* Divider */}
-            <div className="border-t border-slate-700/30" />
+            <div className="border-t border-slate-700/20 my-2" />
 
             {/* ═══════════════════════════════════════════════
                 SECTION 4: ENGINEERING HOURS CALCULATION (Shared)

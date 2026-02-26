@@ -1,5 +1,6 @@
-import { BarChart3, Settings, Flame } from 'lucide-react';
+import { BarChart3, Settings } from 'lucide-react';
 import type { ProjectInfo } from '../App';
+import logoSrc from '../../../assets/logo.png';
 
 interface HomePageProps {
   project?: ProjectInfo | null;
@@ -15,17 +16,18 @@ const HomePage: React.FC<HomePageProps> = ({ project }) => {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6 flex items-start justify-center">
-        <div className="max-w-2xl w-full mt-8">
+        <div className="max-w-2xl w-full mt-8 animate-slide-up">
           {/* Welcome */}
           <div className="text-center mb-10">
-            {project?.avatar ? (
-              <img src={project.avatar} alt="" className="w-14 h-14 rounded-2xl mx-auto mb-4" />
-            ) : (
-              <div className="w-14 h-14 rounded-2xl bg-indigo-500 flex items-center justify-center mx-auto mb-4">
-                <Flame size={28} className="text-white" />
-              </div>
-            )}
-            <h2 className="text-2xl font-bold text-slate-100 mb-2">
+            <img
+              src={project?.avatar || logoSrc}
+              alt=""
+              className="w-14 h-14 rounded-2xl mx-auto mb-4"
+            />
+            <h2
+              className="text-3xl font-bold tracking-tight mb-2"
+              style={{ background: 'linear-gradient(135deg, #f1f5f9, #818cf8, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
+            >
               {project?.name ? `${project.name}` : 'Welcome to Uplift Forge'}
             </h2>
             <p className="text-slate-400 text-sm max-w-md mx-auto">
@@ -39,7 +41,7 @@ const HomePage: React.FC<HomePageProps> = ({ project }) => {
           <div className="space-y-4">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Getting Started</h3>
 
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5 space-y-4">
+            <div className="glass-card p-5 space-y-4">
               <Step
                 number={1}
                 icon={<Settings size={16} />}
@@ -97,7 +99,7 @@ const HomePage: React.FC<HomePageProps> = ({ project }) => {
 
 const Step = ({ number, icon, title, description }: { number: number; icon: React.ReactNode; title: string; description: string }) => (
   <div className="flex gap-3">
-    <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5">
+    <div className="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-300 flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5 ring-1 ring-indigo-500/30">
       {number}
     </div>
     <div>
@@ -108,7 +110,7 @@ const Step = ({ number, icon, title, description }: { number: number; icon: Reac
 );
 
 const FeatureCard = ({ title, description }: { title: string; description: string }) => (
-  <div className="bg-slate-700/30 border border-slate-700/50 rounded-lg p-4">
+  <div className="glass-card p-4 hover:bg-slate-700/40 hover:border-slate-600/50 hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200 cursor-default">
     <h4 className="text-sm font-medium text-slate-200 mb-1">{title}</h4>
     <p className="text-xs text-slate-400 leading-relaxed">{description}</p>
   </div>

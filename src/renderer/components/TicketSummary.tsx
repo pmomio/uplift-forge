@@ -53,17 +53,17 @@ const TicketSummary: React.FC<TicketSummaryProps> = ({ tickets, activeFilter, on
   const completePct = stats.total > 0 ? Math.round((stats.complete / stats.total) * 100) : 0;
 
   return (
-    <div className="mt-3 bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 shadow-xl shadow-black/20 px-5 py-4">
+    <div className="mt-3 bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 shadow-xl shadow-black/20 px-5 py-4 animate-slide-up">
       <div className="flex flex-wrap items-center gap-3 text-xs">
 
         {/* Total */}
-        <div className="bg-slate-700/40 border border-slate-600/30 rounded-lg px-3 py-2 flex items-center gap-2">
+        <div className="bg-slate-700/40 border border-slate-600/30 rounded-lg px-3 py-2 flex items-center gap-2 hover:bg-slate-700/50 hover:border-slate-500/30 transition-colors duration-150">
           <span className="text-slate-400">Tickets</span>
           <span className="text-slate-100 font-semibold text-sm tabular-nums">{stats.total}</span>
         </div>
 
         {/* Status breakdown */}
-        <div className="bg-slate-700/40 border border-slate-600/30 rounded-lg px-3 py-2 flex items-center gap-4">
+        <div className="bg-slate-700/40 border border-slate-600/30 rounded-lg px-3 py-2 flex items-center gap-4 hover:bg-slate-700/50 hover:border-slate-500/30 transition-colors duration-150">
           {Object.entries(stats.byStatus)
             .sort(([, a], [, b]) => b - a)
             .map(([status, count]) => (
@@ -76,7 +76,7 @@ const TicketSummary: React.FC<TicketSummaryProps> = ({ tickets, activeFilter, on
         </div>
 
         {/* Eng Hours */}
-        <div className="bg-slate-700/40 border border-slate-600/30 rounded-lg px-3 py-2 flex items-center gap-4">
+        <div className="bg-slate-700/40 border border-slate-600/30 rounded-lg px-3 py-2 flex items-center gap-4 hover:bg-slate-700/50 hover:border-slate-500/30 transition-colors duration-150">
           <div className="flex items-center gap-1.5">
             <span className="text-slate-400">Avg Hours</span>
             <span className="text-slate-100 font-semibold tabular-nums">
@@ -90,7 +90,7 @@ const TicketSummary: React.FC<TicketSummaryProps> = ({ tickets, activeFilter, on
         </div>
 
         {/* Field coverage */}
-        <div className="bg-slate-700/40 border border-slate-600/30 rounded-lg px-3 py-2 flex items-center gap-2">
+        <div className="bg-slate-700/40 border border-slate-600/30 rounded-lg px-3 py-2 flex items-center gap-2 hover:bg-slate-700/50 hover:border-slate-500/30 transition-colors duration-150">
           <span className="text-slate-400">Fields Complete</span>
           <span className={`font-semibold tabular-nums ${completePct === 100 ? 'text-emerald-400' : 'text-slate-100'}`}>
             {completePct}%
@@ -100,7 +100,7 @@ const TicketSummary: React.FC<TicketSummaryProps> = ({ tickets, activeFilter, on
 
         {/* Missing fields */}
         {(stats.missingTpd > 0 || stats.missingHours > 0 || stats.missingWs > 0) && (
-          <div className="bg-rose-500/8 border border-rose-500/20 rounded-lg px-3 py-2 flex items-center gap-1">
+          <div className="bg-rose-500/8 border border-rose-500/20 rounded-lg px-3 py-2 flex items-center gap-1 shadow-sm shadow-rose-500/5">
             <span className="text-rose-300 mr-2">Missing</span>
             {stats.missingTpd > 0 && (
               <button

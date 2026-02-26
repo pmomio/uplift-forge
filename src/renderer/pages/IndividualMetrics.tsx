@@ -334,8 +334,8 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
                 onClick={() => handlePeriodChange(p.value)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                   period === p.value
-                    ? 'bg-orange-500/20 text-orange-300 shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-orange-500/20 text-orange-300 shadow-sm shadow-orange-500/15'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
                 }`}
               >
                 {p.label}
@@ -354,7 +354,7 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-6 animate-fade-in">
         {loading && !data ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-600 border-t-orange-400"></div>
@@ -367,7 +367,7 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
         ) : (
           <div className="max-w-7xl space-y-6">
             {/* Team Average Row */}
-            <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+            <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden shadow-sm shadow-black/10">
               <div className="px-4 py-3 border-b border-slate-700/40 bg-slate-800/60">
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Team Average (per engineer)</span>
               </div>
@@ -393,11 +393,11 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
             {engineers.map((eng: any, engIdx: number) => {
               const isExpanded = expandedEngineer === eng.accountId;
               return (
-                <div key={eng.accountId} className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
+                <div key={eng.accountId} className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden hover:border-slate-600/50 transition-colors duration-200">
                   {/* Engineer header */}
                   <button
                     onClick={() => setExpandedEngineer(isExpanded ? null : eng.accountId)}
-                    className="w-full px-4 py-3 border-b border-slate-700/40 bg-slate-800/60 flex items-center gap-3 hover:bg-slate-700/40 transition-colors"
+                    className="w-full px-4 py-3 border-b border-slate-700/40 bg-slate-800/60 flex items-center gap-3 hover:bg-slate-700/40 transition-all duration-200"
                   >
                     {isExpanded ? <ChevronDown size={14} className="text-slate-500" /> : <ChevronRight size={14} className="text-slate-500" />}
                     {eng.avatar && <img src={eng.avatar} alt="" className="w-6 h-6 rounded-full" />}
@@ -501,7 +501,7 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
 
             {/* Comparison chart */}
             {engineers.length > 1 && (
-              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden p-4">
+              <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden p-4 shadow-sm shadow-black/10">
                 <h2 className="text-sm font-semibold text-slate-200 mb-4">Team Comparison</h2>
                 <div className="h-72">
                   <ResponsiveContainer width="100%" height="100%">

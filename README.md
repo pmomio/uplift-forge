@@ -37,19 +37,14 @@ cd uplift-forge
 npm install
 ```
 
-### 2. Configure OAuth
-Set environment variables for your Atlassian OAuth app (register at [developer.atlassian.com](https://developer.atlassian.com/console/myapps/)):
-```bash
-export ATLASSIAN_CLIENT_ID=your_client_id
-export ATLASSIAN_CLIENT_SECRET=your_client_secret
-```
-
-### 3. Run
+### 2. Run
 ```bash
 npm start
 ```
 
-The app launches, shows the login page. Click "Connect to Atlassian" to authenticate via SSO.
+On first launch, you'll be prompted to enter your Atlassian OAuth app credentials (Client ID and Client Secret). Register an OAuth app at [developer.atlassian.com](https://developer.atlassian.com/console/myapps/) with callback URL `http://localhost:39871/callback`.
+
+After entering credentials, click "Connect to Atlassian" to authenticate via SSO. Your credentials and session are stored securely — no environment variables needed.
 
 ## Development Commands
 
