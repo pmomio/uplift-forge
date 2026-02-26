@@ -310,7 +310,7 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                       <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 12 }} />
                       <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                      <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 13 }} />
+                      <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 13, color: '#e2e8f0' }} labelStyle={{ color: '#94a3b8' }} itemStyle={{ color: '#e2e8f0' }} />
                       <Legend wrapperStyle={{ fontSize: 12 }} />
                       <Line type="monotone" dataKey="story_points" name="Story Points" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
                       <Line type="monotone" dataKey="eng_hours" name="Eng Hours" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
@@ -331,7 +331,7 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                         <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 12 }} />
                         <YAxis dataKey="name" type="category" tick={{ fill: '#94a3b8', fontSize: 12 }} width={100} />
-                        <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 13 }} />
+                        <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 13, color: '#e2e8f0' }} labelStyle={{ color: '#94a3b8' }} itemStyle={{ color: '#e2e8f0' }} />
                         <Bar dataKey="eng_hours" name="Eng Hours" radius={[0, 4, 4, 0]}>
                           {buData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                         </Bar>
@@ -349,7 +349,7 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
                         <Pie data={wsData} dataKey="eng_hours" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                           {wsData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                         </Pie>
-                        <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 13 }} />
+                        <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 13, color: '#e2e8f0' }} labelStyle={{ color: '#94a3b8' }} itemStyle={{ color: '#e2e8f0' }} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -367,7 +367,7 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
                         <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                         <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 12 }} />
                         <YAxis dataKey="name" type="category" tick={{ fill: '#94a3b8', fontSize: 12 }} width={100} />
-                        <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 13 }} />
+                        <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 13, color: '#e2e8f0' }} labelStyle={{ color: '#94a3b8' }} itemStyle={{ color: '#e2e8f0' }} />
                         <Bar dataKey="story_points" name="Story Points" radius={[0, 4, 4, 0]}>
                           {buData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                         </Bar>
@@ -385,7 +385,7 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
                         <Pie data={typeData} dataKey="tickets" nameKey="name" cx="50%" cy="50%" outerRadius={90} label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
                           {typeData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                         </Pie>
-                        <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 13 }} />
+                        <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 13, color: '#e2e8f0' }} labelStyle={{ color: '#94a3b8' }} itemStyle={{ color: '#e2e8f0' }} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
