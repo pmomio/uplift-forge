@@ -1,6 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Sidebar, { TABS } from '../Sidebar';
+
+vi.mock('../../api', () => ({
+  checkForUpdates: vi.fn(() => Promise.resolve({ data: { currentVersion: '1.0.0' } })),
+}));
 
 describe('Sidebar', () => {
   const defaultProps = {
@@ -8,6 +12,14 @@ describe('Sidebar', () => {
     onTabChange: vi.fn(),
     project: null,
   };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Mock window.api
+    (window as any).api = {
+      openExternal: vi.fn(),
+    };
+  });
 
   it('renders all navigation tabs', () => {
     render(<Sidebar {...defaultProps} />);
@@ -25,7 +37,7 @@ describe('Sidebar', () => {
   it('calls onTabChange when tab clicked', () => {
     const onTabChange = vi.fn();
     render(<Sidebar {...defaultProps} onTabChange={onTabChange} />);
-    fireEvent.click(screen.getByText('Configuration'));
+    fireEvent.click(screen.getByText('Settings'));
     expect(onTabChange).toHaveBeenCalledWith('config');
   });
 
@@ -55,5 +67,20 @@ describe('Sidebar', () => {
   it('does not show lead section when lead is null', () => {
     render(<Sidebar {...defaultProps} project={{ key: 'P', name: 'P', lead: null, avatar: null }} />);
     expect(screen.queryByText('Lead')).not.toBeInTheDocument();
+  });
+
+  it('displays version and developer info', async () => {
+    render(<Sidebar {...defaultProps} />);
+    await waitFor(() => {
+      expect(screen.getByText(/Version 1.0.0/)).toBeInTheDocument();
+      expect(screen.getByText('Parijat Mukherjee')).toBeInTheDocument();
+    });
+  });
+
+  it('opens website when developer name clicked', async () => {
+    render(<Sidebar {...defaultProps} />);
+    await waitFor(() => screen.getByText('Parijat Mukherjee'));
+    fireEvent.click(screen.getByText('Parijat Mukherjee'));
+    expect((window as any).api.openExternal).toHaveBeenCalledWith('https://www.parijatmukherjee.com');
   });
 });

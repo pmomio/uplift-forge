@@ -1,6 +1,7 @@
-import React from 'react';
-import { Settings, BarChart3, Home, TrendingUp, Users, LogOut } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Settings, BarChart3, Home, TrendingUp, Users, LogOut, Info } from 'lucide-react';
 import type { ProjectInfo } from '../App';
+import { checkForUpdates } from '../api';
 import logoSrc from '../../../assets/logo.png';
 
 export interface Tab {
@@ -14,7 +15,7 @@ export const TABS: Tab[] = [
   { id: 'attribution', label: 'Eng. Attribution', icon: <BarChart3 size={18} /> },
   { id: 'metrics', label: 'Team Metrics', icon: <TrendingUp size={18} /> },
   { id: 'individual', label: 'Individual Metrics', icon: <Users size={18} /> },
-  { id: 'config', label: 'Configuration', icon: <Settings size={18} /> },
+  { id: 'config', label: 'Settings', icon: <Settings size={18} /> },
 ];
 
 interface SidebarProps {
@@ -27,6 +28,16 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, project, email, onLogout, onReset }) => {
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    checkForUpdates().then((res: any) => {
+      if (res.data?.currentVersion) {
+        setVersion(res.data.currentVersion);
+      }
+    }).catch(() => {});
+  }, []);
+
   return (
     <aside className="w-56 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-r border-slate-700/30 flex flex-col flex-shrink-0">
       {/* macOS traffic light spacer + drag region */}
@@ -106,6 +117,27 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, project, emai
           )}
         </div>
       )}
+
+      {/* About Section */}
+      <div className="px-4 py-4 mt-auto border-t border-slate-700/30">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1.5 text-slate-500">
+            <Info size={12} />
+            <span className="text-[10px] uppercase tracking-wider font-semibold">About</span>
+          </div>
+          <p className="text-[11px] text-slate-400 font-medium">
+            Version {version || '1.0.0'}
+          </p>
+          <p className="text-[10px] text-slate-500 leading-tight">
+            Developed by <button
+              onClick={() => window.api.openExternal('https://www.parijatmukherjee.com')}
+              className="text-indigo-400/80 hover:text-indigo-300 transition-colors"
+            >
+              Parijat Mukherjee
+            </button>
+          </p>
+        </div>
+      </div>
     </aside>
   );
 };

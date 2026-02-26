@@ -362,7 +362,7 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
         ) : engineers.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-slate-400 text-sm">No tracked engineers configured.</p>
-            <p className="text-slate-500 text-xs mt-1">Go to Configuration → Individual Metrics to select team members.</p>
+            <p className="text-slate-500 text-xs mt-1">Go to Settings → Metrics to select team members.</p>
           </div>
         ) : (
           <div className="max-w-7xl space-y-6">

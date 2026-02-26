@@ -94,7 +94,7 @@ const EngineeringAttribution: React.FC<EngineeringAttributionProps> = ({ refresh
         ) : tickets.length === 0 ? (
           <div className="flex flex-col justify-center items-center h-64 gap-2">
             <p className="text-slate-300 font-medium">No tickets in cache</p>
-            <p className="text-sm text-slate-500">Click "Sync Now" to fetch tickets from JIRA, or go to Configuration to set up your project.</p>
+            <p className="text-sm text-slate-500">Click "Sync Now" to fetch tickets from JIRA, or go to Settings to set up your project.</p>
           </div>
         ) : (
           <>

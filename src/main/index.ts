@@ -20,6 +20,7 @@ const createWindow = (): void => {
     title: 'Uplift Forge',
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#0f172a', // slate-900
+    icon: path.join(__dirname, '../../assets/logo.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

@@ -21,12 +21,11 @@ A standalone Electron desktop app for engineering team performance. Connect via 
 - **Inline Editing**: Edit fields directly and save back to JIRA.
 - **Bulk actions**: Calculate All and Save All for batch operations.
 
-### Configuration
-- **JIRA Connection** — Project key, data time range.
-- **Team Metrics** — Story points field, SP calibration.
-- **Engineering Attribution** — Field mappings, mapping rules.
-- **Engineering Hours** — Start/end/excluded statuses.
-- **Individual Metrics** — Tracked engineers.
+### Settings
+- **General** — JIRA connection (Project key, data range), field mappings, and display filters.
+- **Metrics** — Story point calibration and tracked engineers selection.
+- **Engineering Attribution** — Automated mapping rules (TPD BU, Work Streams) and Work Cycle definition (start/end/excluded statuses).
+- **Application Settings** — Manual update checks and version information.
 
 ## Quick Start
 

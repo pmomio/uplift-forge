@@ -46,7 +46,7 @@ const HomePage: React.FC<HomePageProps> = ({ project }) => {
                 number={1}
                 icon={<Settings size={16} />}
                 title="Configure your JIRA project"
-                description="Go to Configuration and set your JIRA Project Key, then click Fetch Fields to load your custom fields and statuses."
+                description="Go to Settings and set your JIRA Project Key, then click Fetch Fields to load your custom fields and statuses."
               />
               <Step
                 number={2}
