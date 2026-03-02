@@ -20,12 +20,29 @@ export interface HistoryEntry {
 }
 
 /**
+ * Safely read the 'toString' own property from a changelog item.
+ * JIRA uses 'toString' as a property name which collides with Object.prototype.toString.
+ * When the property is missing from JSON, item.toString returns the inherited function
+ * instead of undefined, so nullish coalescing (??) won't catch it.
+ */
+function getStatusTo(item: HistoryItem): string {
+  const raw = item as Record<string, unknown>;
+  return typeof raw['toString'] === 'string' ? raw['toString'] : '';
+}
+
+function getStatusFrom(item: HistoryItem): string {
+  return item.fromString ?? '';
+}
+
+/**
  * Calculate engineering hours from changelog histories.
  *
- * 1. Find first transition to start status.
- * 2. Find first transition to end status after start.
- * 3. Exclude blocked periods.
- * 4. Compute office hours (timezone-aware, weekends excluded).
+ * Uses a state machine to track ALL active development periods across
+ * multiple start→end cycles. A ticket may bounce between start and end
+ * statuses several times (e.g. rework, multiple developers).
+ *
+ * States: idle → active → blocked → active → idle (one cycle)
+ * Active time accumulates across every completed cycle.
  */
 export function calculateEngineeringHours(histories: HistoryEntry[]): number | null {
   if (!Array.isArray(histories)) return null;
@@ -33,94 +50,62 @@ export function calculateEngineeringHours(histories: HistoryEntry[]): number | n
   const cfg = getConfig();
   const startStatus = cfg.eng_start_status.toLowerCase();
   const endStatus = cfg.eng_end_status.toLowerCase();
+  const excluded = cfg.eng_excluded_statuses.map((s) => s.toLowerCase());
 
   // Sort by creation time
   const sorted = [...histories].sort(
     (a, b) => DateTime.fromISO(a.created).toMillis() - DateTime.fromISO(b.created).toMillis(),
   );
 
-  // Find first transition to start status
-  let inProgressTs: DateTime | null = null;
-  for (const history of sorted) {
-    for (const item of history.items) {
-      if (item.field === 'status') {
-        const statusTo = (item.toString ?? '').toLowerCase();
-        if (statusTo === startStatus && !inProgressTs) {
-          inProgressTs = DateTime.fromISO(history.created);
-          break;
-        }
-      }
-    }
-    if (inProgressTs) break;
-  }
-  if (!inProgressTs) return null;
-
-  // Find first transition to end status after start
-  let inReviewTs: DateTime | null = null;
-  for (const history of sorted) {
-    const ts = DateTime.fromISO(history.created);
-    if (ts <= inProgressTs) continue;
-    for (const item of history.items) {
-      if (item.field === 'status') {
-        const statusTo = (item.toString ?? '').toLowerCase();
-        if (statusTo === endStatus) {
-          inReviewTs = ts;
-          break;
-        }
-      }
-    }
-    if (inReviewTs) break;
-  }
-  if (!inReviewTs) return null;
-
-  // Find periods in excluded statuses within the window
-  const excluded = cfg.eng_excluded_statuses.map((s) => s.toLowerCase());
-  const blockedPeriods: Array<[DateTime, DateTime]> = [];
-  let blockedStart: DateTime | null = null;
-
-  for (const history of sorted) {
-    const ts = DateTime.fromISO(history.created);
-    if (ts <= inProgressTs || ts >= inReviewTs) continue;
-    for (const item of history.items) {
-      if (item.field === 'status') {
-        const statusTo = (item.toString ?? '').toLowerCase();
-        const statusFrom = (item.fromString ?? '').toLowerCase();
-        if (excluded.includes(statusTo) && blockedStart === null) {
-          blockedStart = ts;
-        } else if (excluded.includes(statusFrom) && blockedStart !== null) {
-          blockedPeriods.push([blockedStart, ts]);
-          blockedStart = null;
-        }
-      }
-    }
-  }
-  // If still in excluded status at end, cap at end timestamp
-  if (blockedStart !== null) {
-    blockedPeriods.push([blockedStart, inReviewTs]);
-  }
-
-  // Build active (non-blocked) intervals
-  if (blockedPeriods.length === 0) {
-    return computeOfficeHours(inProgressTs, inReviewTs, cfg.office_hours);
-  }
-
-  blockedPeriods.sort((a, b) => a[0].toMillis() - b[0].toMillis());
+  // State machine: track active development periods across all cycles
+  type State = 'idle' | 'active' | 'blocked';
+  let state: State = 'idle';
+  let periodStart: DateTime | null = null;
   const activePeriods: Array<[DateTime, DateTime]> = [];
-  let currentStart = inProgressTs;
-  for (const [blockStart, blockEnd] of blockedPeriods) {
-    if (currentStart < blockStart) {
-      activePeriods.push([currentStart, blockStart]);
+
+  for (const history of sorted) {
+    const ts = DateTime.fromISO(history.created);
+    for (const item of history.items) {
+      if (item.field !== 'status') continue;
+
+      const statusTo = getStatusTo(item).toLowerCase();
+
+      if (statusTo === startStatus) {
+        // Entering start status → begin active period (if not already active)
+        if (state !== 'active') {
+          state = 'active';
+          periodStart = ts;
+        }
+      } else if (statusTo === endStatus) {
+        // Entering end status → close active period (if active)
+        if (state === 'active' && periodStart) {
+          activePeriods.push([periodStart, ts]);
+          periodStart = null;
+        }
+        state = 'idle';
+      } else if (excluded.includes(statusTo)) {
+        // Entering excluded status → pause clock (if active)
+        if (state === 'active' && periodStart) {
+          activePeriods.push([periodStart, ts]);
+          periodStart = null;
+        }
+        state = 'blocked';
+      } else if (state === 'blocked') {
+        // Leaving excluded status to a non-start/end status → resume clock
+        state = 'active';
+        periodStart = ts;
+      }
     }
-    currentStart = blockEnd;
-  }
-  if (currentStart < inReviewTs) {
-    activePeriods.push([currentStart, inReviewTs]);
   }
 
-  return activePeriods.reduce(
+  if (activePeriods.length === 0) return null;
+
+  const total = activePeriods.reduce(
     (sum, [s, e]) => sum + computeOfficeHours(s, e, cfg.office_hours),
     0,
   );
+
+  return Math.round(total * 10) / 10;
 }
 
 /**

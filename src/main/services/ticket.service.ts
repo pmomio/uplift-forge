@@ -218,15 +218,62 @@ export async function syncSingleTicket(key: string): Promise<ProcessedTicket | n
 
 /**
  * Calculate engineering hours for a single ticket from changelog.
+ * Returns hours + diagnostics so the UI can explain why calculation failed.
  */
-export async function calculateTicketHours(key: string): Promise<{ hours: number | null }> {
+export async function calculateTicketHours(key: string): Promise<{
+  hours: number | null;
+  diagnostics?: {
+    configuredStart: string;
+    configuredEnd: string;
+    statusTransitions: Array<{ from: string; to: string; created: string }>;
+    rawFirstItem?: Record<string, unknown>;
+  };
+}> {
+  const cfg = getConfig();
   const changelog = await jira.getIssueChangelog(key);
   const histories = (changelog.histories ?? []) as Array<{
     created: string;
     items: Array<{ field: string; toString?: string; fromString?: string }>;
   }>;
+
+  // Collect all status transitions for diagnostics
+  const statusTransitions: Array<{ from: string; to: string; created: string }> = [];
+  let rawFirstItem: Record<string, unknown> | undefined;
+  for (const history of histories) {
+    for (const item of history.items) {
+      if (item.field === 'status') {
+        const raw = item as Record<string, unknown>;
+        if (!rawFirstItem) {
+          rawFirstItem = { ...raw };
+          console.log(`[Tickets] Raw changelog item keys for ${key}:`, Object.keys(raw));
+          console.log(`[Tickets] Raw changelog item for ${key}:`, JSON.stringify(raw));
+        }
+        // Use bracket notation to safely read own properties
+        // (avoids collision with Object.prototype.toString)
+        statusTransitions.push({
+          from: String(raw['fromString'] ?? ''),
+          to: String(raw['toString'] ?? ''),
+          created: history.created,
+        });
+      }
+    }
+  }
+
   const hours = calculateEngineeringHours(histories);
-  return { hours };
+
+  if (hours === null) {
+    console.log(`[Tickets] Hours calc failed for ${key}. Config: start="${cfg.eng_start_status}", end="${cfg.eng_end_status}". Transitions:`, statusTransitions);
+  }
+
+  return {
+    hours,
+    diagnostics: {
+      configuredStart: cfg.eng_start_status,
+      configuredEnd: cfg.eng_end_status,
+      statusTransitions,
+      rawFirstItem,
+    },
+  };
 }
 
 /**

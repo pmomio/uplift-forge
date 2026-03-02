@@ -139,8 +139,17 @@ function calcTrend(current: number | null | undefined, previous: number | null |
 // For metrics where DOWN is good (bug_ratio, bug_hours_pct, avg_cycle_time, avg_hours_per_sp)
 const LOWER_IS_BETTER = new Set(['bug_ratio', 'bug_count', 'bug_hours_pct', 'avg_cycle_time', 'avg_hours_per_sp']);
 
-function trendColor(key: string, direction: 'up' | 'down' | 'flat' | null): string {
+function trendColor(key: string, direction: 'up' | 'down' | 'flat' | null, current?: number | null, prev?: number | null): string {
   if (!direction || direction === 'flat') return 'text-slate-400';
+
+  // Estimation accuracy is special: closer to 1.0 is better
+  if (key === 'estimation_accuracy' && current != null && prev != null) {
+    const currentDist = Math.abs(1.0 - current);
+    const prevDist = Math.abs(1.0 - prev);
+    const improved = currentDist < prevDist;
+    return improved ? 'text-emerald-400' : 'text-rose-400';
+  }
+
   const goodUp = !LOWER_IS_BETTER.has(key);
   if (direction === 'up') return goodUp ? 'text-emerald-400' : 'text-rose-400';
   return goodUp ? 'text-rose-400' : 'text-emerald-400';
@@ -292,7 +301,7 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
                 helpKey="estimation_accuracy"
                 trendKey="estimation_accuracy"
                 prev={ps?.estimation_accuracy}
-                color={s.estimation_accuracy === null ? undefined : s.estimation_accuracy >= 0.8 && s.estimation_accuracy <= 1.2 ? 'text-emerald-400' : 'text-amber-400'}
+                color={s.estimation_accuracy === null ? undefined : s.estimation_accuracy >= 0.8 && s.estimation_accuracy <= 1.2 ? 'text-emerald-400' : 'text-rose-400'}
               />
               <KpiCard label="Avg Hours / SP" value={s.avg_eng_hours_per_sp} suffix="h" helpKey="avg_hours_per_sp" trendKey="avg_hours_per_sp" prev={ps?.avg_eng_hours_per_sp} />
               <KpiCard label="Avg Cycle Time" value={s.avg_cycle_time_hours} suffix="h" helpKey="avg_cycle_time" trendKey="avg_cycle_time" prev={ps?.avg_cycle_time_hours} />
@@ -411,6 +420,13 @@ const HelpTooltip = ({ helpKey }: { helpKey: string }) => {
     setPos({ top: rect.bottom + 8, left: Math.max(left, 160) });
   };
 
+  const isLowerBetter = LOWER_IS_BETTER.has(helpKey);
+  const isAccuracy = helpKey === 'estimation_accuracy';
+
+  // For accuracy, we'll use neutral slate for the help icons because "Up" isn't always good/bad
+  const upColor = isAccuracy ? 'text-slate-400' : (isLowerBetter ? 'text-rose-400' : 'text-emerald-400');
+  const downColor = isAccuracy ? 'text-slate-400' : (isLowerBetter ? 'text-emerald-400' : 'text-rose-400');
+
   return (
     <span className="inline-flex" onMouseEnter={handleEnter} onMouseLeave={() => setPos(null)}>
       <HelpCircle size={13} className="text-slate-500 hover:text-indigo-400 transition-colors cursor-help" />
@@ -428,12 +444,12 @@ const HelpTooltip = ({ helpKey }: { helpKey: string }) => {
             <span className="block text-[11px] text-slate-300 leading-relaxed mb-2">{help.target}</span>
             <span className="block border-t border-slate-700/60 pt-2 mt-1">
               <span className="flex items-start gap-1.5 mb-1.5">
-                <TrendingUp size={11} className="text-emerald-400 mt-0.5 flex-shrink-0" />
-                <span className="text-[11px] text-slate-300 leading-relaxed"><span className="font-semibold text-emerald-400">Up trend: </span>{help.trend_up}</span>
+                <TrendingUp size={11} className={`${upColor} mt-0.5 flex-shrink-0`} />
+                <span className="text-[11px] text-slate-300 leading-relaxed"><span className={`font-semibold ${upColor}`}>Up trend: </span>{help.trend_up}</span>
               </span>
               <span className="flex items-start gap-1.5">
-                <TrendingDown size={11} className="text-rose-400 mt-0.5 flex-shrink-0" />
-                <span className="text-[11px] text-slate-300 leading-relaxed"><span className="font-semibold text-rose-400">Down trend: </span>{help.trend_down}</span>
+                <TrendingDown size={11} className={`${downColor} mt-0.5 flex-shrink-0`} />
+                <span className="text-[11px] text-slate-300 leading-relaxed"><span className={`font-semibold ${downColor}`}>Down trend: </span>{help.trend_down}</span>
               </span>
             </span>
           </span>
@@ -449,7 +465,7 @@ const TrendBadge = ({ trendKey, current, prev, suffix }: { trendKey: string; cur
   const { direction, pct } = calcTrend(current, prev);
   if (!direction || pct === null) return null;
 
-  const color = trendColor(trendKey, direction);
+  const color = trendColor(trendKey, direction, current, prev);
   const Icon = direction === 'up' ? TrendingUp : direction === 'down' ? TrendingDown : Minus;
   const sfx = suffix || '';
 

@@ -160,7 +160,17 @@ const TicketTable: React.FC<TicketTableProps> = ({ tickets, onUpdate, missingFil
       if (res.data.hours !== null) {
         handleFieldChange(key, 'eng_hours', res.data.hours);
       } else {
-        toast.error('Could not calculate hours (no matching status transitions found)', { id: `calc-hours-${key}` });
+        const diag = res.data.diagnostics;
+        if (diag) {
+          const transitions = diag.statusTransitions.map((t: any) => `${t.from} → ${t.to}`).join(', ');
+          console.warn(`[Hours] Calc failed for ${key}. Looking for: "${diag.configuredStart}" → "${diag.configuredEnd}". Found transitions: ${transitions}`);
+          toast.error(
+            `No match. Looking for "${diag.configuredStart}" → "${diag.configuredEnd}" but found: ${transitions || 'none'}`,
+            { id: `calc-hours-${key}`, duration: 8000 },
+          );
+        } else {
+          toast.error('Could not calculate hours (no matching status transitions found)', { id: `calc-hours-${key}` });
+        }
       }
     } catch (error) {
       console.error('Failed to calculate hours', error);

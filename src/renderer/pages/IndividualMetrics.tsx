@@ -145,15 +145,32 @@ function calcTrend(current: number | null | undefined, previous: number | null |
   return { direction: 'flat', pct: 0 };
 }
 
-function trendColor(lowerIsBetter: boolean, direction: string | null): string {
+function trendColor(key: string, direction: string | null, current?: number | null, prev?: number | null, lowerIsBetter?: boolean): string {
   if (!direction || direction === 'flat') return 'text-slate-500';
+
+  // Estimation accuracy is special: closer to 1.0 is better
+  if (key === 'estimation_accuracy' && current != null && prev != null) {
+    const currentDist = Math.abs(1.0 - current);
+    const prevDist = Math.abs(1.0 - prev);
+    const improved = currentDist < prevDist;
+    return improved ? 'text-emerald-400' : 'text-rose-400';
+  }
+
   const goodUp = !lowerIsBetter;
   if (direction === 'up') return goodUp ? 'text-emerald-400' : 'text-rose-400';
   return goodUp ? 'text-rose-400' : 'text-emerald-400';
 }
 
-function compareColor(value: number | null | undefined, teamAvg: number | null | undefined, lowerIsBetter: boolean): string {
+function compareColor(key: string, value: number | null | undefined, teamAvg: number | null | undefined, lowerIsBetter: boolean): string {
   if (value == null || teamAvg == null || teamAvg === 0) return 'text-slate-300';
+
+  // Estimation accuracy: closer to 1.0 is better
+  if (key === 'estimation_accuracy') {
+    const dist = Math.abs(1.0 - value);
+    if (dist <= 0.15) return 'text-emerald-400'; // 0.85 - 1.15 is green
+    return 'text-rose-400';
+  }
+
   const ratio = value / teamAvg;
   if (lowerIsBetter) {
     if (ratio < 0.85) return 'text-emerald-400';
@@ -166,7 +183,8 @@ function compareColor(value: number | null | undefined, teamAvg: number | null |
 }
 
 // --- Trend Badge (matches TeamMetrics style) ---
-const TrendBadge = ({ current, prev, lowerIsBetter, format }: {
+const TrendBadge = ({ kpiKey, current, prev, lowerIsBetter, format }: {
+  kpiKey: string;
   current: number | null | undefined;
   prev: number | null | undefined;
   lowerIsBetter: boolean;
@@ -176,7 +194,7 @@ const TrendBadge = ({ current, prev, lowerIsBetter, format }: {
   const { direction, pct } = calcTrend(current, prev);
   if (!direction || pct === null) return null;
 
-  const color = trendColor(lowerIsBetter, direction);
+  const color = trendColor(kpiKey, direction, current, prev, lowerIsBetter);
   const Icon = direction === 'up' ? TrendingUp : direction === 'down' ? TrendingDown : Minus;
 
   const handleEnter = (e: React.MouseEvent) => {
@@ -216,7 +234,7 @@ const TrendBadge = ({ current, prev, lowerIsBetter, format }: {
 };
 
 // --- Help tooltip (matches TeamMetrics style) ---
-const HelpTooltip = ({ help }: { help: HelpContent }) => {
+const HelpTooltip = ({ help, isLowerBetter, isAccuracy }: { help: HelpContent; isLowerBetter?: boolean; isAccuracy?: boolean }) => {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
   const handleEnter = (e: React.MouseEvent) => {
@@ -224,6 +242,10 @@ const HelpTooltip = ({ help }: { help: HelpContent }) => {
     const left = Math.min(rect.left + rect.width / 2, window.innerWidth - 160);
     setPos({ top: rect.bottom + 8, left: Math.max(left, 160) });
   };
+
+  // For accuracy, use neutral slate for help icons
+  const upColor = isAccuracy ? 'text-slate-400' : (isLowerBetter ? 'text-rose-400' : 'text-emerald-400');
+  const downColor = isAccuracy ? 'text-slate-400' : (isLowerBetter ? 'text-emerald-400' : 'text-rose-400');
 
   return (
     <span className="inline-flex" onMouseEnter={handleEnter} onMouseLeave={() => setPos(null)}>
@@ -242,12 +264,12 @@ const HelpTooltip = ({ help }: { help: HelpContent }) => {
             <span className="block text-[11px] text-slate-300 leading-relaxed mb-2">{help.target}</span>
             <span className="block border-t border-slate-700/60 pt-2 mt-1">
               <span className="flex items-start gap-1.5 mb-1.5">
-                <TrendingUp size={11} className="text-emerald-400 mt-0.5 flex-shrink-0" />
-                <span className="text-[11px] text-slate-300 leading-relaxed"><span className="font-semibold text-emerald-400">Up trend: </span>{help.trend_up}</span>
+                <TrendingUp size={11} className={`${upColor} mt-0.5 flex-shrink-0`} />
+                <span className="text-[11px] text-slate-300 leading-relaxed"><span className={`font-semibold ${upColor}`}>Up trend: </span>{help.trend_up}</span>
               </span>
               <span className="flex items-start gap-1.5">
-                <TrendingDown size={11} className="text-rose-400 mt-0.5 flex-shrink-0" />
-                <span className="text-[11px] text-slate-300 leading-relaxed"><span className="font-semibold text-rose-400">Down trend: </span>{help.trend_down}</span>
+                <TrendingDown size={11} className={`${downColor} mt-0.5 flex-shrink-0`} />
+                <span className="text-[11px] text-slate-300 leading-relaxed"><span className={`font-semibold ${downColor}`}>Down trend: </span>{help.trend_down}</span>
               </span>
             </span>
           </span>
@@ -379,10 +401,10 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
                     <div key={kpi.key} className="bg-slate-800/80 px-3 py-3 text-center">
                       <div className="flex items-center justify-center gap-1 mb-1">
                         <span className="text-[10px] text-slate-500 uppercase tracking-wider">{kpi.label}</span>
-                        <HelpTooltip help={kpi.help} />
+                        <HelpTooltip help={kpi.help} isLowerBetter={kpi.lowerIsBetter} isAccuracy={kpi.key === 'estimation_accuracy'} />
                       </div>
                       <span className="text-sm font-semibold text-slate-300 tabular-nums">{kpi.format(val)}</span>
-                      {hasPrev && <TrendBadge current={val} prev={prev} lowerIsBetter={kpi.lowerIsBetter} format={kpi.format} />}
+                      {hasPrev && <TrendBadge kpiKey={kpi.key} current={val} prev={prev} lowerIsBetter={kpi.lowerIsBetter} format={kpi.format} />}
                     </div>
                   );
                 })}
@@ -411,18 +433,18 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
                       const val = eng.metrics?.[kpi.key];
                       const prev = eng.prev_metrics?.[kpi.key];
                       const avg = teamAvg[kpi.key];
-                      const cmpColor = compareColor(val, avg, kpi.lowerIsBetter);
+                      const cmpColor = compareColor(kpi.key, val, avg, kpi.lowerIsBetter);
 
                       return (
                         <div key={kpi.key} className="bg-slate-800/80 px-3 py-3 text-center">
                           <div className="flex items-center justify-center gap-1 mb-1">
                             <span className="text-[10px] text-slate-500 uppercase tracking-wider">{kpi.label}</span>
-                            <HelpTooltip help={kpi.help} />
+                            <HelpTooltip help={kpi.help} isLowerBetter={kpi.lowerIsBetter} isAccuracy={kpi.key === 'estimation_accuracy'} />
                           </div>
                           <span className={`text-sm font-semibold tabular-nums ${cmpColor}`}>
                             {kpi.format(val)}
                           </span>
-                          {hasPrev && <TrendBadge current={val} prev={prev} lowerIsBetter={kpi.lowerIsBetter} format={kpi.format} />}
+                          {hasPrev && <TrendBadge kpiKey={kpi.key} current={val} prev={prev} lowerIsBetter={kpi.lowerIsBetter} format={kpi.format} />}
                           {/* vs team avg */}
                           {avg != null && val != null && (
                             <div className="text-[9px] text-slate-600 mt-0.5">
@@ -471,19 +493,19 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
                                 <div key={kpi.key} className="flex items-center gap-3">
                                   <span className="text-xs text-slate-400 w-28 flex items-center gap-1">
                                     {kpi.label}
-                                    <HelpTooltip help={kpi.help} />
+                                    <HelpTooltip help={kpi.help} isLowerBetter={kpi.lowerIsBetter} isAccuracy={kpi.key === 'estimation_accuracy'} />
                                   </span>
                                   <div className="flex-1 bg-slate-700/40 rounded-full h-2.5 overflow-hidden">
                                     <div
                                       className={`h-full rounded-full transition-all ${
-                                        compareColor(val, avg, kpi.lowerIsBetter) === 'text-emerald-400' ? 'bg-emerald-500'
-                                        : compareColor(val, avg, kpi.lowerIsBetter) === 'text-rose-400' ? 'bg-rose-500'
+                                        compareColor(kpi.key, val, avg, kpi.lowerIsBetter) === 'text-emerald-400' ? 'bg-emerald-500'
+                                        : compareColor(kpi.key, val, avg, kpi.lowerIsBetter) === 'text-rose-400' ? 'bg-rose-500'
                                         : 'bg-orange-500'
                                       }`}
                                       style={{ width: `${Math.min(pctOfAvg ?? 50, 200) / 2}%` }}
                                     />
                                   </div>
-                                  <span className={`text-xs tabular-nums font-medium w-16 text-right ${compareColor(val, avg, kpi.lowerIsBetter)}`}>
+                                  <span className={`text-xs tabular-nums font-medium w-16 text-right ${compareColor(kpi.key, val, avg, kpi.lowerIsBetter)}`}>
                                     {kpi.format(val)}
                                   </span>
                                   <span className="text-[10px] text-slate-600 w-16 text-right">avg {kpi.format(avg)}</span>

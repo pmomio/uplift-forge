@@ -173,6 +173,97 @@ describe('calculateEngineeringHours', () => {
     ];
     expect(calculateEngineeringHours(histories)).toBe(4.0);
   });
+
+  it('multiple start→end cycles accumulate total hours', () => {
+    // Cycle 1: In Progress (10:00) → Code Review (12:00) = 2h
+    // Cycle 2: In Progress (14:00) → Code Review (16:00) = 2h
+    // Total = 4h
+    const histories = [
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 10 }, { zone: tz }).toISO()!, 'Open', 'In Progress'),
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 12 }, { zone: tz }).toISO()!, 'In Progress', 'Code Review'),
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 14 }, { zone: tz }).toISO()!, 'Code Review', 'In Progress'),
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 16 }, { zone: tz }).toISO()!, 'In Progress', 'Code Review'),
+    ];
+    expect(calculateEngineeringHours(histories)).toBe(4.0);
+  });
+
+  it('three cycles with blocked periods', () => {
+    // Cycle 1: In Progress (09:00) → Code Review (10:00) = 1h
+    // Cycle 2: In Progress (11:00) → Blocked (12:00) = 1h active, then blocked
+    //          Blocked (12:00) → In Progress (14:00) = not counted
+    //          In Progress (14:00) → Code Review (16:00) = 2h
+    // Total = 1 + 1 + 2 = 4h
+    const histories = [
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 9 }, { zone: tz }).toISO()!, 'Open', 'In Progress'),
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 10 }, { zone: tz }).toISO()!, 'In Progress', 'Code Review'),
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 11 }, { zone: tz }).toISO()!, 'Code Review', 'In Progress'),
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 12 }, { zone: tz }).toISO()!, 'In Progress', 'Blocked'),
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 14 }, { zone: tz }).toISO()!, 'Blocked', 'In Progress'),
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 16 }, { zone: tz }).toISO()!, 'In Progress', 'Code Review'),
+    ];
+    expect(calculateEngineeringHours(histories)).toBe(4.0);
+  });
+
+  it('blocked then directly to end status', () => {
+    // In Progress (10:00) → Blocked (12:00) = 2h active
+    // Blocked → Code Review (14:00) = blocked time not counted
+    // Total = 2h
+    const histories = [
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 10 }, { zone: tz }).toISO()!, 'Open', 'In Progress'),
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 12 }, { zone: tz }).toISO()!, 'In Progress', 'Blocked'),
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 14 }, { zone: tz }).toISO()!, 'Blocked', 'Code Review'),
+    ];
+    expect(calculateEngineeringHours(histories)).toBe(2.0);
+  });
+
+  it('incomplete second cycle only counts first', () => {
+    // Cycle 1: In Progress (10:00) → Code Review (12:00) = 2h
+    // Cycle 2: In Progress (14:00) → (still open, no end) = not counted
+    // Total = 2h
+    const histories = [
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 10 }, { zone: tz }).toISO()!, 'Open', 'In Progress'),
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 12 }, { zone: tz }).toISO()!, 'In Progress', 'Code Review'),
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 14 }, { zone: tz }).toISO()!, 'Code Review', 'In Progress'),
+    ];
+    expect(calculateEngineeringHours(histories)).toBe(2.0);
+  });
+
+  it('intermediate statuses keep clock running', () => {
+    // In Progress (10:00) → Peer Review (12:00): clock keeps running (not end/excluded)
+    // Peer Review (12:00) → Code Review (14:00): only In Progress→Peer Review was 'active' state
+    // Wait — Peer Review is neither start, end, nor excluded. State stays 'active'.
+    // So total active: In Progress (10:00) → Code Review (14:00) = 4h
+    const histories = [
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 10 }, { zone: tz }).toISO()!, 'Open', 'In Progress'),
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 12 }, { zone: tz }).toISO()!, 'In Progress', 'Peer Review'),
+      makeStatusHistory(DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 14 }, { zone: tz }).toISO()!, 'Peer Review', 'Code Review'),
+    ];
+    expect(calculateEngineeringHours(histories)).toBe(4.0);
+  });
+
+  it('handles raw JIRA items where toString is not an own property', () => {
+    const histories = [
+      {
+        created: DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 10 }, { zone: tz }).toISO()!,
+        items: [Object.assign(Object.create(null), { field: 'status', fromString: 'Open', toString: 'In Progress' })],
+      },
+      {
+        created: DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 14 }, { zone: tz }).toISO()!,
+        items: [Object.assign(Object.create(null), { field: 'status', fromString: 'In Progress', toString: 'Code Review' })],
+      },
+    ];
+    expect(calculateEngineeringHours(histories)).toBe(4.0);
+  });
+
+  it('gracefully handles missing toString property (no prototype fallback)', () => {
+    const histories = [
+      {
+        created: DateTime.fromObject({ year: 2026, month: 2, day: 26, hour: 10 }, { zone: tz }).toISO()!,
+        items: [{ field: 'status', fromString: 'Open' }],
+      },
+    ];
+    expect(calculateEngineeringHours(histories as any)).toBeNull();
+  });
 });
 
 // ----- evaluateRule -----
