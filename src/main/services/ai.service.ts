@@ -1,5 +1,6 @@
 import { getAiApiKey, getAiProvider } from '../auth/ai-key-store.js';
-import type { AiSuggestRequest, AiSuggestResponse } from '../../shared/types.js';
+import { getConfig } from './config.service.js';
+import type { AiSuggestRequest, AiSuggestResponse, Persona } from '../../shared/types.js';
 
 const SYSTEM_PROMPT = `You are a senior engineering manager with 15+ years of experience leading high-performing software teams. You analyze engineering metrics and provide actionable improvement suggestions.
 
@@ -13,6 +14,59 @@ RULES:
 
 Example output format:
 ["Schedule a team estimation calibration session — your accuracy ratio of 0.6x suggests consistent under-estimation of complexity.", "Break down tickets above 5 SP into smaller deliverables to reduce cycle time variance."]`;
+
+/** Persona-specific system prompt overrides */
+const PERSONA_SYSTEM_PROMPTS: Record<Persona, string> = {
+  management: `You are a strategic advisor to a C-level engineering executive. You analyze cross-team engineering metrics and provide high-level, strategic recommendations for organizational improvement.
+
+RULES:
+- Return ONLY a JSON array of 2-4 suggestion strings. No other text.
+- Focus on strategic, organizational-level actions (hiring, team structure, resource allocation, process changes).
+- Frame suggestions in terms of business impact and ROI.
+- Be executive-level concise — each suggestion should be 1-2 sentences max.
+- Consider cross-project and cross-team implications.
+
+Example output format:
+["The 40% bug ratio across teams suggests a systemic testing gap — consider investing in a dedicated QA function or automated testing infrastructure.", "Team velocity dropped 20% while headcount stayed flat — investigate if re-org overhead or context switching is the root cause."]`,
+
+  engineering_manager: SYSTEM_PROMPT,
+
+  individual: `You are a personal engineering coach helping a software developer improve their individual performance and career growth. You analyze personal engineering metrics and provide practical, growth-oriented suggestions.
+
+RULES:
+- Return ONLY a JSON array of 2-4 suggestion strings. No other text.
+- Focus on personal skill development, habits, and workflow improvements.
+- Be encouraging while being honest about areas for improvement.
+- Frame suggestions as growth opportunities, not criticisms.
+- Each suggestion should be 1-2 sentences max.
+- Compare against team averages when relevant to provide context.
+
+Example output format:
+["Your cycle time of 24h per ticket is 50% above team average — try breaking larger tasks into smaller PRs for faster feedback loops.", "Strong estimation accuracy at 1.05x — document your estimation approach to share with the team."]`,
+
+  delivery_manager: `You are a delivery risk analyst focused on epic completion and on-time delivery. You analyze project delivery metrics and provide risk mitigation strategies.
+
+RULES:
+- Return ONLY a JSON array of 2-4 suggestion strings. No other text.
+- Focus on delivery risks, timeline impacts, and mitigation strategies.
+- Prioritize actions that unblock progress and reduce delivery risk.
+- Be direct and practical — each suggestion should be 1-2 sentences max.
+- Consider epic progress, blocked tickets, and cycle time trends.
+
+Example output format:
+["3 blocked tickets in Epic X are holding up 40% of remaining work — escalate blockers in today's standup and assign owners.", "Cycle time has increased 30% this sprint — check if scope creep on in-progress tickets is the cause."]`,
+};
+
+/**
+ * Get the system prompt appropriate for the current persona.
+ */
+export function getSystemPrompt(): string {
+  const cfg = getConfig();
+  if (cfg.persona && PERSONA_SYSTEM_PROMPTS[cfg.persona]) {
+    return PERSONA_SYSTEM_PROMPTS[cfg.persona];
+  }
+  return SYSTEM_PROMPT;
+}
 
 export function buildUserPrompt(req: AiSuggestRequest): string {
   const parts: string[] = [];
@@ -150,11 +204,12 @@ export async function getAiSuggestions(req: AiSuggestRequest): Promise<AiSuggest
   }
 
   const userPrompt = buildUserPrompt(req);
+  const systemPrompt = getSystemPrompt();
 
   try {
     const rawResponse = provider === 'openai'
-      ? await callOpenAI(apiKey, SYSTEM_PROMPT, userPrompt)
-      : await callClaude(apiKey, SYSTEM_PROMPT, userPrompt);
+      ? await callOpenAI(apiKey, systemPrompt, userPrompt)
+      : await callClaude(apiKey, systemPrompt, userPrompt);
 
     const suggestions = parseAiResponse(rawResponse);
 

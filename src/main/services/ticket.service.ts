@@ -136,6 +136,16 @@ export function processIssue(issue: Record<string, unknown>, storeRaw = true): v
     // Get base URL from auth
     const baseUrl = ''; // Will be populated from cloud ID in renderer
 
+    // Extract parent epic info (JIRA v3 includes parent in issue response)
+    const parentObj = fields.parent as Record<string, unknown> | null;
+    const parentKey = parentObj ? (parentObj.key as string) ?? undefined : undefined;
+    const parentFields = parentObj ? (parentObj.fields as Record<string, unknown>) ?? {} : {};
+    const parentSummary = parentFields.summary as string | undefined;
+
+    // Extract labels
+    const rawLabels = fields.labels as string[] | null;
+    const labels = rawLabels && rawLabels.length > 0 ? rawLabels : undefined;
+
     ticketCache.set(key, {
       key,
       summary,
@@ -152,6 +162,9 @@ export function processIssue(issue: Record<string, unknown>, storeRaw = true): v
       resolved: fields.resolutiondate as string | null,
       base_url: baseUrl,
       updated: fields.updated as string | null,
+      parent_key: parentKey,
+      parent_summary: parentSummary,
+      labels,
     });
   } catch (e) {
     console.error(`[Tickets] Error processing issue ${(issue as Record<string, unknown>).key}:`, e);
@@ -341,6 +354,14 @@ export async function updateTicket(
     persistCaches();
   }
   return ticket ?? null;
+}
+
+/**
+ * Get all tickets from cache (regardless of status or filter).
+ * Used by epic service for comprehensive epic analysis.
+ */
+export function getAllTickets(): ProcessedTicket[] {
+  return Array.from(ticketCache.values());
 }
 
 /**

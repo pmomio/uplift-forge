@@ -6,9 +6,11 @@ import * as jiraService from '../services/jira.service.js';
 import * as ticketService from '../services/ticket.service.js';
 import * as metricsService from '../services/metrics.service.js';
 import * as updateService from '../services/update.service.js';
+import * as projectService from '../services/project.service.js';
+import * as epicService from '../services/epic.service.js';
 import { saveAiConfig, getAiConfig, deleteAiConfig } from '../auth/ai-key-store.js';
 import * as aiService from '../services/ai.service.js';
-import type { AuthState, AiProvider, AiSuggestRequest } from '../../shared/types.js';
+import type { AuthState, AiProvider, AiSuggestRequest, ProjectConfig } from '../../shared/types.js';
 
 /**
  * Register all ipcMain.handle() handlers.
@@ -54,6 +56,9 @@ export function registerIpcHandlers(): void {
       mapping_rules: payload.mapping_rules as ReturnType<typeof getConfig>['mapping_rules'] | undefined,
       sp_to_days: payload.sp_to_days as number | undefined,
       tracked_engineers: payload.tracked_engineers as ReturnType<typeof getConfig>['tracked_engineers'] | undefined,
+      persona: payload.persona as ReturnType<typeof getConfig>['persona'] | undefined,
+      metric_preferences: payload.metric_preferences as ReturnType<typeof getConfig>['metric_preferences'] | undefined,
+      projects: payload.projects as ReturnType<typeof getConfig>['projects'] | undefined,
     });
 
     const needsSync = projectKeyChanged || filterChanged;
@@ -149,4 +154,32 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(Channels.AI_CONFIG_TEST, () => aiService.testAiConnection());
 
   ipcMain.handle(Channels.AI_SUGGEST, (_event, req: AiSuggestRequest) => aiService.getAiSuggestions(req));
+
+  // ----- Multi-Project -----
+  ipcMain.handle(Channels.PROJECT_LIST, () => projectService.listProjects());
+
+  ipcMain.handle(Channels.PROJECT_ADD, (_event, project: ProjectConfig) => projectService.addProject(project));
+
+  ipcMain.handle(Channels.PROJECT_UPDATE, (_event, projectKey: string, updates: Partial<ProjectConfig>) =>
+    projectService.updateProject(projectKey, updates));
+
+  ipcMain.handle(Channels.PROJECT_REMOVE, (_event, projectKey: string) => projectService.removeProject(projectKey));
+
+  ipcMain.handle(Channels.PROJECT_SYNC, async (_event, projectKey: string) => {
+    const count = await projectService.syncProject(projectKey);
+    return { status: 'success', count };
+  });
+
+  ipcMain.handle(Channels.METRICS_CROSS_PROJECT, (_event, period: string) =>
+    projectService.getCrossProjectMetrics(period));
+
+  // ----- Epics -----
+  ipcMain.handle(Channels.EPICS_LIST, () => epicService.getEpicSummaries());
+
+  ipcMain.handle(Channels.EPIC_DETAIL, (_event, epicKey: string) => epicService.getEpicDetail(epicKey));
+
+  ipcMain.handle(Channels.EPICS_SYNC, async () => {
+    await ticketService.syncTickets();
+    return epicService.getEpicSummaries();
+  });
 }

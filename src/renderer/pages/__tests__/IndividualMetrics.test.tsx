@@ -19,6 +19,7 @@ vi.mock('../../api', () => ({
   getIndividualMetrics: vi.fn(),
   triggerSync: vi.fn(),
   getAiConfig: vi.fn(),
+  getConfig: vi.fn().mockResolvedValue({ data: { persona: 'engineering_manager' } }),
 }));
 
 import IndividualMetrics from '../IndividualMetrics';

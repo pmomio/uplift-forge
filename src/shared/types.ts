@@ -1,5 +1,41 @@
 /** Shared TypeScript interfaces used by both main and renderer processes. */
 
+// --- Persona Types ---
+export type Persona = 'management' | 'engineering_manager' | 'individual' | 'delivery_manager';
+
+export interface MetricPreferences {
+  visible: string[];
+  hidden: string[];
+}
+
+// --- Multi-Project Types ---
+export interface ProjectConfig {
+  project_key: string;
+  project_name?: string;
+  field_ids: FieldIds;
+  mapping_rules: MappingRules;
+  eng_start_status: string;
+  eng_end_status: string;
+  eng_excluded_statuses?: string[];
+  ticket_filter?: TicketFilter;
+}
+
+// --- Epic Types ---
+export interface EpicSummary {
+  key: string;
+  summary: string;
+  totalTickets: number;
+  resolvedTickets: number;
+  totalSP: number;
+  resolvedSP: number;
+  progressPct: number;
+  avgCycleTime: number | null;
+  riskScore: number;
+  riskLevel: 'low' | 'medium' | 'high';
+  riskFactors: string[];
+  childTickets: ProcessedTicket[];
+}
+
 export interface Rule {
   field: string;
   operator: 'equals' | 'contains' | 'starts_with' | 'in';
@@ -50,6 +86,9 @@ export interface AppConfig {
   ticket_filter: TicketFilter;
   sp_to_days: number;
   tracked_engineers: TrackedEngineer[];
+  persona?: Persona;
+  metric_preferences?: MetricPreferences;
+  projects?: ProjectConfig[];
 }
 
 export interface ProcessedTicket {
@@ -68,6 +107,9 @@ export interface ProcessedTicket {
   resolved: string | null;
   base_url: string;
   updated: string | null;
+  parent_key?: string;
+  parent_summary?: string;
+  labels?: string[];
 }
 
 export interface MetricsSummary {

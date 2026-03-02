@@ -8,6 +8,7 @@ import type {
   TeamMetricsResponse,
   IndividualSummary,
   IndividualMetricsResponse,
+  Persona,
 } from '../../shared/types.js';
 
 /**
@@ -15,6 +16,26 @@ import type {
  */
 
 const BUG_TYPES = new Set(['bug', 'defect']);
+
+/** Default metrics shown by persona in priority order (team-level KPIs). */
+export const PERSONA_DEFAULT_METRICS: Record<Persona, { visible: string[]; hidden: string[] }> = {
+  management: {
+    visible: ['total_tickets', 'total_story_points', 'total_eng_hours', 'bug_ratio'],
+    hidden: ['estimation_accuracy', 'avg_eng_hours_per_sp', 'avg_cycle_time_hours', 'bug_count', 'bug_eng_hours_pct'],
+  },
+  engineering_manager: {
+    visible: ['total_tickets', 'total_story_points', 'total_eng_hours', 'estimation_accuracy', 'avg_eng_hours_per_sp', 'avg_cycle_time_hours', 'bug_count', 'bug_ratio', 'bug_eng_hours_pct'],
+    hidden: [],
+  },
+  individual: {
+    visible: ['total_tickets', 'total_eng_hours', 'total_story_points', 'estimation_accuracy', 'complexity_score', 'focus_ratio'],
+    hidden: ['bug_count', 'bug_ratio', 'bug_eng_hours_pct', 'avg_cycle_time_hours'],
+  },
+  delivery_manager: {
+    visible: ['total_tickets', 'total_story_points', 'total_eng_hours', 'avg_cycle_time_hours', 'bug_count'],
+    hidden: ['estimation_accuracy', 'avg_eng_hours_per_sp', 'bug_ratio', 'bug_eng_hours_pct'],
+  },
+};
 
 const PERIOD_DAYS: Record<string, number> = {
   weekly: 7,

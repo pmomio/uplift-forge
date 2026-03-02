@@ -59,6 +59,19 @@ const api = {
   deleteAiConfig: () => ipcRenderer.invoke(Channels.AI_CONFIG_DELETE),
   testAiConnection: () => ipcRenderer.invoke(Channels.AI_CONFIG_TEST),
   getAiSuggestions: (req: unknown) => ipcRenderer.invoke(Channels.AI_SUGGEST, req),
+
+  // Multi-Project
+  listProjects: () => ipcRenderer.invoke(Channels.PROJECT_LIST),
+  addProject: (project: unknown) => ipcRenderer.invoke(Channels.PROJECT_ADD, project),
+  updateProject: (projectKey: string, updates: unknown) => ipcRenderer.invoke(Channels.PROJECT_UPDATE, projectKey, updates),
+  removeProject: (projectKey: string) => ipcRenderer.invoke(Channels.PROJECT_REMOVE, projectKey),
+  syncProject: (projectKey: string) => ipcRenderer.invoke(Channels.PROJECT_SYNC, projectKey),
+  getCrossProjectMetrics: (period: string) => ipcRenderer.invoke(Channels.METRICS_CROSS_PROJECT, period),
+
+  // Epics
+  listEpics: () => ipcRenderer.invoke(Channels.EPICS_LIST),
+  getEpicDetail: (epicKey: string) => ipcRenderer.invoke(Channels.EPIC_DETAIL, epicKey),
+  syncEpics: () => ipcRenderer.invoke(Channels.EPICS_SYNC),
 };
 
 contextBridge.exposeInMainWorld('api', api);

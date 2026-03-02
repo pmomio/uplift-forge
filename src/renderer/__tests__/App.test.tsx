@@ -9,6 +9,7 @@ vi.mock('react-hot-toast', () => ({
 vi.mock('../api', () => ({
   getAuthState: vi.fn(),
   getJiraProject: vi.fn(),
+  getConfig: vi.fn(),
   resetApp: vi.fn(),
 }));
 
@@ -52,6 +53,18 @@ vi.mock('../components/UpdateBanner', () => ({
   default: () => <div data-testid="update-banner" />,
 }));
 
+vi.mock('../components/OnboardingWizard', () => ({
+  default: ({ onComplete }: any) => (
+    <div data-testid="onboarding-wizard">
+      <button onClick={onComplete}>Complete Onboarding</button>
+    </div>
+  ),
+}));
+
+vi.mock('../pages/EpicTracker', () => ({
+  default: () => <div data-testid="epic-tracker-page">Epic Tracker</div>,
+}));
+
 vi.mock('../pages/LoginPage', () => ({
   default: ({ onLoginSuccess }: any) => (
     <div data-testid="login-page">
@@ -61,7 +74,7 @@ vi.mock('../pages/LoginPage', () => ({
 }));
 
 import App from '../App';
-import { getAuthState, getJiraProject, resetApp } from '../api';
+import { getAuthState, getJiraProject, getConfig, resetApp } from '../api';
 
 describe('App', () => {
   beforeEach(() => {
@@ -70,6 +83,10 @@ describe('App', () => {
       logout: vi.fn().mockResolvedValue(undefined),
       onAuthStateChanged: vi.fn(() => vi.fn()), // returns unsubscribe
     };
+    // Default: return a persona so tests get past the onboarding gate
+    (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: { persona: 'engineering_manager' },
+    });
   });
 
   it('shows loading spinner initially', () => {

@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Search, Calculator, Download, Filter, X, TrendingUp, BarChart3, Link, Clock, Users, Check, Settings, RefreshCw, ExternalLink, Sparkles, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Save, Search, Calculator, Download, Filter, X, TrendingUp, BarChart3, Link, Clock, Users, Check, Settings, RefreshCw, ExternalLink, Sparkles, Eye, EyeOff, Trash2, Briefcase, User, ClipboardList } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getConfig, saveConfig, getJiraFields, getJiraStatuses, getJiraMembers, checkForUpdates, downloadUpdate, getAiConfig, setAiConfig, deleteAiConfig, testAiConnection } from '../api';
 import RuleBuilder from './RuleBuilder';
-import type { UpdateInfo, AiProvider } from '../../shared/types';
+import type { UpdateInfo, AiProvider, Persona } from '../../shared/types';
+
+const PERSONA_OPTIONS: { value: Persona; label: string; icon: React.ReactNode }[] = [
+  { value: 'management', label: 'Management / VIP', icon: <Briefcase size={14} /> },
+  { value: 'engineering_manager', label: 'Engineering Manager', icon: <Users size={14} /> },
+  { value: 'individual', label: 'Individual Contributor', icon: <User size={14} /> },
+  { value: 'delivery_manager', label: 'Delivery Manager', icon: <ClipboardList size={14} /> },
+];
 
 interface ConfigPanelProps {
   onConfigSaved?: () => void;
@@ -147,6 +154,9 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
         mapping_rules: config.mapping_rules || { tpd_bu: {}, work_stream: {} },
         sp_to_days: config.sp_to_days ?? 1,
         tracked_engineers: config.tracked_engineers || [],
+        persona: config.persona,
+        metric_preferences: config.metric_preferences,
+        projects: config.projects,
       });
       if (result.data.sync_triggered) {
         toast.success(`Config saved — synced ${result.data.ticket_count} tickets`);
@@ -262,6 +272,35 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
           <div className="max-w-4xl mx-auto">
             {activeTab === 'general' && (
               <div className="space-y-8 animate-slide-up">
+                {/* Persona selector */}
+                <div className="space-y-4">
+                  <FeatureHeader
+                    icon={<User size={16} className="text-white" />}
+                    title="Your Role"
+                    description="Controls which tabs, metrics, and AI suggestions are shown by default."
+                    color="bg-violet-500"
+                  />
+                  <section className="bg-violet-500/10 p-4 rounded-lg border border-violet-500/20">
+                    <div className="flex flex-wrap gap-2">
+                      {PERSONA_OPTIONS.map(opt => (
+                        <button
+                          key={opt.value}
+                          onClick={() => setConfig({ ...config, persona: opt.value })}
+                          className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
+                            config?.persona === opt.value
+                              ? 'bg-violet-500/20 border-violet-500/40 text-violet-300 shadow-sm shadow-violet-500/15'
+                              : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                          }`}
+                        >
+                          {opt.icon}
+                          {opt.label}
+                          {config?.persona === opt.value && <Check size={14} className="text-violet-400" />}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+
                 <div className="space-y-4">
                   <FeatureHeader
                     icon={<Link size={16} className="text-white" />}

@@ -18,12 +18,14 @@
 
 You connect to JIRA. Uplift Forge pulls your tickets, crunches the numbers, and gives you:
 
+- 🎭 **Persona-Based Dashboards** — tailored experience for Management VIPs, Engineering Managers, Individual Contributors, and Delivery Managers
 - ⏱️ **Engineering Hours** — auto-calculated from status transitions, respecting office hours, weekends, and blocked periods
 - 📊 **Team Metrics** — 9 KPI cards with trends, charts, breakdowns by business unit and work stream
 - 🧑‍💻 **Individual Metrics** — per-engineer performance with team comparisons
+- 🏔️ **Epic Tracker** — epic-level progress tracking with auto-computed risk scores and delivery risk analysis
 - 🧠 **Smart Attribution** — rule-based classification of tickets into business units and work streams
 - ✏️ **JIRA Write-back** — edit fields inline and push them straight back to JIRA
-- 🤖 **AI Suggestions** — connect OpenAI or Claude to get actionable improvement suggestions for any KPI metric
+- 🤖 **AI Suggestions** — connect OpenAI or Claude to get persona-aware actionable improvement suggestions for any KPI metric
 
 All data stays on your machine. 🏠 Your credentials live in your OS keychain. 🔐 Nothing leaves your laptop (except JIRA API calls and optional AI provider calls).
 
@@ -71,11 +73,26 @@ Hit save, and you're off to the races! 🏁
 
 ---
 
-## 📑 The Five Tabs
+## 🎭 Persona System
+
+On first launch (or after upgrading), an **Onboarding Wizard** 🧙‍♂️ guides you through selecting your role:
+
+| Persona | What You See |
+|---------|-------------|
+| 🏢 **Management / VIP** | Cross-project summaries, strategic KPIs, team health |
+| 👥 **Engineering Manager / VP** | Full metric access, individual engineer performance, epic tracking |
+| 🧑‍💻 **Individual Contributor** | Own performance front & center, team average comparison |
+| 📋 **Delivery Manager** | Epic progress tracking, risk identification, cycle time analysis |
+
+Your persona controls which tabs are visible, which metrics are prioritized, and how AI suggestions are framed. Change it anytime in Settings. ⚙️
+
+---
+
+## 📑 The Tabs
 
 ### 🏠 Home
 
-A friendly welcome screen with a getting-started guide. Nothing fancy — just helpful. 👋
+A persona-aware welcome screen with a getting-started guide. Shows different greetings based on your role. 👋
 
 ### 📊 Engineering Attribution
 
@@ -118,11 +135,21 @@ Same depth, but per-engineer. Pick your tracked team members in Settings, and yo
 
 Two bonus metrics here: 🧩 **Complexity Score** (average SP per ticket) and 🎯 **Focus Ratio** (percentage of product work).
 
+### 🏔️ Epic Tracker
+
+Track epic-level delivery progress 📋. Visible for Engineering Managers and Delivery Managers.
+
+- 📊 **Summary stats** — total epics, high/medium/low risk counts
+- 🃏 **Epic cards** — expandable cards showing progress bars, risk badges, ticket counts, and story points
+- ⚠️ **Auto-computed risk scores** — weighted formula based on progress, overdue tickets, blocked items, bug ratio, and reopened tickets
+- 📋 **Child ticket table** — drill into each epic to see its child tickets with status, SP, and hours
+- 🤖 **AI Risk Analysis** — per-epic AI suggestions for risk mitigation
+
 ### 🔧 Settings
 
 Four tabs:
 
-- 🌐 **General** — Project key, data range (1-12 months), field ID mappings, ticket filters
+- 🌐 **General** — Persona selection 🎭, project key, data range (1-12 months), field ID mappings, ticket filters
 - 📊 **Metrics** — Story point calibration (SP-to-days ratio) and tracked engineers
 - 📏 **Attribution** — Visual rule builder for TPD BU and Work Stream (supports AND/OR logic on parent key, labels, components, summary, etc.)
 - 🖥️ **Application** — AI provider setup (OpenAI / Claude), version info, manual update check
@@ -202,8 +229,8 @@ src/
     ipc/            📡 IPC handler registrations
     services/       🧠 Business logic (config, JIRA, tickets, metrics, field engine, updates)
   renderer/       🎨 React frontend
-    pages/          📄 Home, Login, Attribution, Team Metrics, Individual Metrics
-    components/     🧩 Sidebar, ConfigPanel, TicketTable, RuleBuilder, etc.
+    pages/          📄 Home, Login, Attribution, Team Metrics, Individual Metrics, Epic Tracker
+    components/     🧩 Sidebar, ConfigPanel, TicketTable, RuleBuilder, OnboardingWizard, etc.
   shared/         🤝 Types and IPC channel constants
 test/
   main/           🧪 Service unit tests
@@ -211,7 +238,7 @@ test/
 
 ### 🧪 Testing
 
-279 tests across 14 test suites. Coverage thresholds enforced:
+**Unit Tests**: 525 tests across 25 test suites (Vitest + Testing Library). Coverage thresholds enforced:
 
 | Metric | Threshold |
 |--------|-----------|
@@ -219,6 +246,17 @@ test/
 | 🔀 Branches | 80% |
 | ⚡ Functions | 85% |
 | 📏 Lines | 90% |
+
+**E2E Tests**: ~53 end-to-end tests using Playwright + Electron 🎭. Tests launch the real packaged app with an isolated user-data directory and a local JIRA mock server.
+
+| Command | What it does |
+|---------|-------------|
+| `npm run test:e2e` | 🎭 Run all e2e tests |
+| `npm run test:e2e:headed` | 👀 Run e2e tests with visible window |
+| `npm run test:e2e:debug` | 🐛 Debug mode with Playwright Inspector |
+| `npm run test:all` | 🧪🎭 Run unit + e2e tests |
+
+E2E tests cover: login flow, onboarding wizard, persona-based navigation, settings, ticket sync, team/individual metrics, epic tracker, and logout/reset.
 
 ---
 

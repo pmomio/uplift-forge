@@ -50,3 +50,16 @@ export const setAiConfig = (provider: string, apiKey: string) => wrap(window.api
 export const deleteAiConfig = () => wrap(window.api.deleteAiConfig());
 export const testAiConnection = () => wrap(window.api.testAiConnection());
 export const getAiSuggestions = (req: unknown) => wrap(window.api.getAiSuggestions(req));
+
+// Multi-Project
+export const listProjects = () => wrap(window.api.listProjects());
+export const addProject = (project: unknown) => wrap(window.api.addProject(project));
+export const updateProjectConfig = (projectKey: string, updates: unknown) => wrap(window.api.updateProject(projectKey, updates));
+export const removeProject = (projectKey: string) => wrap(window.api.removeProject(projectKey));
+export const syncProject = (projectKey: string) => wrap(window.api.syncProject(projectKey));
+export const getCrossProjectMetrics = (period = 'all') => wrap(window.api.getCrossProjectMetrics(period));
+
+// Epics
+export const listEpics = () => wrap(window.api.listEpics());
+export const getEpicDetail = (epicKey: string) => wrap(window.api.getEpicDetail(epicKey));
+export const syncEpics = () => wrap(window.api.syncEpics());

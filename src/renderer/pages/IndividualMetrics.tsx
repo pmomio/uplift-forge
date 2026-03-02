@@ -1,13 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, HelpCircle, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import toast from 'react-hot-toast';
-import { getIndividualMetrics, triggerSync, getAiConfig } from '../api';
+import { getIndividualMetrics, triggerSync, getAiConfig, getConfig } from '../api';
 import SuggestionPanel from '../components/SuggestionPanel';
 import type { ProjectInfo } from '../App';
-import type { AiSuggestRequest, AiProvider } from '../../shared/types';
+import type { AiSuggestRequest, AiProvider, Persona, MetricPreferences } from '../../shared/types';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#64748b'];
 
@@ -281,12 +281,21 @@ const HelpTooltip = ({ help, isLowerBetter, isAccuracy }: { help: HelpContent; i
   );
 };
 
+/** Persona defaults for individual KPI visibility */
+const PERSONA_INDIVIDUAL_DEFAULTS: Record<Persona, string[]> = {
+  management: ['total_tickets', 'total_story_points', 'total_eng_hours'],
+  engineering_manager: KPI_DEFS.map(k => k.key),
+  individual: ['total_tickets', 'total_eng_hours', 'total_story_points', 'estimation_accuracy', 'complexity_score', 'focus_ratio'],
+  delivery_manager: ['total_tickets', 'total_story_points', 'total_eng_hours', 'avg_cycle_time_hours'],
+};
+
 interface IndividualMetricsProps {
   refreshKey: number;
   project?: ProjectInfo | null;
+  persona?: Persona;
 }
 
-const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, project }) => {
+const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, project, persona }) => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -296,6 +305,7 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
   const [aiProvider, setAiProvider] = useState<AiProvider>('openai');
   const [suggestionOpen, setSuggestionOpen] = useState(false);
   const [suggestionRequest, setSuggestionRequest] = useState<AiSuggestRequest | null>(null);
+  const [metricPrefs, setMetricPrefs] = useState<MetricPreferences | undefined>(undefined);
 
   const fetchData = useCallback(async (p?: string) => {
     setLoading(true);
@@ -330,7 +340,27 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
       setAiConfigured(cfg.hasKey);
       setAiProvider(cfg.provider);
     }).catch(() => {});
-  }, []);
+    getConfig().then(res => {
+      const cfg = res.data as { metric_preferences?: MetricPreferences };
+      setMetricPrefs(cfg.metric_preferences);
+    }).catch(() => {});
+  }, [refreshKey]);
+
+  /** Filter KPI_DEFS by persona/preferences */
+  const visibleKpiDefs = useMemo(() => {
+    if (metricPrefs?.visible?.length) {
+      return metricPrefs.visible
+        .map(key => KPI_DEFS.find(k => k.key === key))
+        .filter((k): k is typeof KPI_DEFS[number] => !!k);
+    }
+    if (persona) {
+      const defaults = PERSONA_INDIVIDUAL_DEFAULTS[persona];
+      return defaults
+        .map(key => KPI_DEFS.find(k => k.key === key))
+        .filter((k): k is typeof KPI_DEFS[number] => !!k);
+    }
+    return KPI_DEFS;
+  }, [metricPrefs, persona]);
 
   const handleSuggest = useCallback((kpi: typeof KPI_DEFS[number], current: number | null | undefined, prev: number | null | undefined, engineerName?: string, teamAvgValue?: number | null) => {
     const { direction, pct } = calcTrend(current ?? null, prev ?? null);
@@ -427,8 +457,8 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
               <div className="px-4 py-3 border-b border-slate-700/40 bg-slate-800/60">
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Team Average (per engineer)</span>
               </div>
-              <div className="grid grid-cols-9 gap-px bg-slate-700/30">
-                {KPI_DEFS.map(kpi => {
+              <div className={`grid gap-px bg-slate-700/30`} style={{ gridTemplateColumns: `repeat(${visibleKpiDefs.length}, minmax(0, 1fr))` }}>
+                {visibleKpiDefs.map(kpi => {
                   const val = teamAvg[kpi.key];
                   const prev = prevTeamAvg[kpi.key];
                   return (
@@ -462,8 +492,8 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
                   </button>
 
                   {/* KPI cells */}
-                  <div className="grid grid-cols-9 gap-px bg-slate-700/30">
-                    {KPI_DEFS.map(kpi => {
+                  <div className="grid gap-px bg-slate-700/30" style={{ gridTemplateColumns: `repeat(${visibleKpiDefs.length}, minmax(0, 1fr))` }}>
+                    {visibleKpiDefs.map(kpi => {
                       const val = eng.metrics?.[kpi.key];
                       const prev = eng.prev_metrics?.[kpi.key];
                       const avg = teamAvg[kpi.key];

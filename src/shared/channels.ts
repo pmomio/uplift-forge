@@ -47,6 +47,19 @@ export const Channels = {
   AI_CONFIG_SET: 'ai:config-set',
   AI_CONFIG_DELETE: 'ai:config-delete',
   AI_CONFIG_TEST: 'ai:config-test',
+
+  // Multi-Project
+  PROJECT_LIST: 'project:list',
+  PROJECT_ADD: 'project:add',
+  PROJECT_UPDATE: 'project:update',
+  PROJECT_REMOVE: 'project:remove',
+  PROJECT_SYNC: 'project:sync',
+  METRICS_CROSS_PROJECT: 'metrics:cross-project',
+
+  // Epics
+  EPICS_LIST: 'epics:list',
+  EPIC_DETAIL: 'epics:detail',
+  EPICS_SYNC: 'epics:sync',
 } as const;
 
 export type Channel = (typeof Channels)[keyof typeof Channels];

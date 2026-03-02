@@ -8,7 +8,7 @@ Engineering team performance platform. ⚡ Electron desktop app that connects to
 - **Frontend**: ⚛️ React 19, 🎨 Tailwind CSS 4, 📈 Recharts, ✨ Lucide icons, 🍞 react-hot-toast
 - **Build**: 🔨 Electron Forge + Vite (separate configs for main/preload/renderer)
 - **Language**: 📘 TypeScript 5.9, strict mode, ESNext modules
-- **Testing**: 🧪 Vitest + jsdom + Testing Library (coverage thresholds: 90/80/85/90)
+- **Testing**: 🧪 Vitest + jsdom + Testing Library (coverage thresholds: 90/80/85/90) + 🎭 Playwright e2e
 - **Date/Time**: 🕐 Luxon (timezone-aware office hours calculation)
 - **Storage**: 💾 electron-store (config, ticket cache, auth credentials via OS keychain)
 
@@ -25,30 +25,34 @@ src/
 │   ├── ipc/
 │   │   └── handlers.ts            # 📡 All ipcMain.handle() registrations
 │   └── services/
-│       ├── config.service.ts      # ⚙️ AppConfig via electron-store, defaults
+│       ├── config.service.ts      # ⚙️ AppConfig via electron-store, defaults (incl. persona, metric prefs, projects)
 │       ├── jira.service.ts        # 🔗 JIRA REST API v3 (Basic auth, /search/jql)
 │       ├── field-engine.service.ts # 🧮 Eng hours calc (state machine) + rule-based field mapping
 │       ├── ticket.service.ts      # 🎫 Ticket caching, sync, processing, JIRA write-back
-│       ├── metrics.service.ts     # 📊 Team + individual KPI computation
-│       ├── ai.service.ts          # 🤖 AI suggestion service (OpenAI + Claude)
+│       ├── metrics.service.ts     # 📊 Team + individual KPI computation (persona-default metrics)
+│       ├── ai.service.ts          # 🤖 AI suggestion service (OpenAI + Claude, persona-aware prompts)
+│       ├── epic.service.ts        # 🏔️ Epic aggregation, risk scoring, child ticket grouping
+│       ├── project.service.ts     # 📁 Multi-project CRUD, cross-project metric aggregation
 │       └── update.service.ts      # 🔄 OTA update check via GitHub Releases
 ├── renderer/                      # 🎨 React frontend
-│   ├── App.tsx                    # 🏠 Root: auth gate, sidebar routing, refresh key
+│   ├── App.tsx                    # 🏠 Root: auth gate, persona gate, onboarding, sidebar routing
 │   ├── api.ts                     # 📡 IPC wrappers (mimics Axios {data} shape)
 │   ├── pages/
-│   │   ├── HomePage.tsx           # 👋 Static welcome/getting-started
+│   │   ├── HomePage.tsx           # 👋 Persona-aware welcome/getting-started
 │   │   ├── LoginPage.tsx          # 🔑 API token login form
 │   │   ├── EngineeringAttribution.tsx  # 📊 Ticket table + sync
 │   │   ├── TeamMetrics.tsx        # 👥 Team KPI cards, trends, breakdowns (Recharts)
-│   │   └── IndividualMetrics.tsx  # 🧑‍💻 Per-engineer KPIs with team comparison
+│   │   ├── IndividualMetrics.tsx  # 🧑‍💻 Per-engineer KPIs with team comparison
+│   │   └── EpicTracker.tsx        # 🏔️ Epic progress tracking + risk analysis
 │   └── components/
-│       ├── Sidebar.tsx            # 🧭 Navigation + project info
-│       ├── ConfigPanel.tsx        # ⚙️ Tabbed settings (project, statuses, field IDs, rules, engineers)
+│       ├── Sidebar.tsx            # 🧭 Navigation + project info (persona-filtered tabs)
+│       ├── ConfigPanel.tsx        # ⚙️ Tabbed settings (persona, project, statuses, field IDs, rules)
+│       ├── OnboardingWizard.tsx   # 🧙 Multi-step onboarding wizard (persona + project setup)
 │       ├── TicketTable.tsx        # ✏️ Editable ticket grid with calc buttons
 │       ├── TicketSummary.tsx      # 📈 Summary stats bar
 │       ├── RuleBuilder.tsx        # 🔀 AND/OR rule editor for field mapping
 │       ├── ModalDialog.tsx        # 💬 Reusable modal
-│       ├── SuggestionPanel.tsx    # 🤖 AI suggestion slide-out panel
+│       ├── SuggestionPanel.tsx    # 🤖 AI suggestion slide-out panel (persona-aware titles)
 │       └── UpdateBanner.tsx       # 🆕 OTA update notification
 └── shared/                        # 🤝 Shared between main and renderer
     ├── types.ts                   # 📘 All TypeScript interfaces
@@ -60,7 +64,28 @@ test/
     ├── ai.service.test.ts         # 🤖 AI service tests (prompt, parsing, providers, errors)
     ├── jira.service.test.ts       # 🔗 JIRA API tests (auth, pagination, CRUD)
     ├── ticket.service.test.ts     # 🎫 Ticket processing, sync, members
+    ├── epic.service.test.ts       # 🏔️ Epic aggregation + risk scoring tests
+    ├── project.service.test.ts    # 📁 Multi-project CRUD tests
     └── update.test.ts             # 🔄 Update service tests
+e2e/                               # 🎭 End-to-end tests (Playwright + Electron)
+├── playwright.config.ts           # ⚙️ Playwright config (workers=1, 60s timeout)
+├── global-setup.ts                # 🏗️ Ensures packaged app exists before tests
+├── fixtures/
+│   ├── electron.fixture.ts        # 🔌 Core fixture: temp userDataDir, JIRA mock, Electron launch
+│   ├── jira-mock-server.ts        # 🔗 Local HTTP server mimicking JIRA REST API v3
+│   └── mock-data.ts               # 📦 Canned JIRA issues, fields, statuses, members
+├── helpers/
+│   └── app-helpers.ts             # 🛠️ loginViaUI(), completeOnboarding(), navigateTo()
+└── tests/
+    ├── 01-login.spec.ts           # 🔑 Login form validation, auth flow
+    ├── 02-onboarding.spec.ts      # 🧙 Wizard steps, persona selection, project setup
+    ├── 03-navigation.spec.ts      # 🧭 Sidebar tabs, persona-based visibility
+    ├── 04-settings.spec.ts        # ⚙️ ConfigPanel tabs, save, field fetch
+    ├── 05-attribution.spec.ts     # 📊 Ticket table, sync, empty state
+    ├── 06-team-metrics.spec.ts    # 👥 KPI cards, period selector, charts
+    ├── 07-individual-metrics.spec.ts # 🧑‍💻 Per-engineer KPIs, team comparison
+    ├── 08-epic-tracker.spec.ts    # 🏔️ Epic cards, risk badges, expand/collapse
+    └── 09-logout-reset.spec.ts    # 🚪 Logout, auth clear, reset app
 ```
 
 ## 💻 Commands
@@ -71,6 +96,10 @@ npm test               # 🧪 Run all tests (vitest run)
 npm run test:watch     # 👀 Watch mode
 npm run test:coverage  # 📊 Coverage report (v8)
 npm run lint           # 🔍 ESLint
+npm run test:e2e       # 🎭 Run e2e tests (Playwright + Electron)
+npm run test:e2e:headed # 👀 E2e tests with visible window
+npm run test:e2e:debug # 🐛 E2e debug mode (Playwright Inspector)
+npm run test:all       # 🧪🎭 Run unit + e2e tests
 npm run package        # 📦 Package the app
 npm run make           # 🏗️ Build distributables (DMG, Squirrel, ZIP)
 npm run publish        # 🚀 Publish to GitHub Releases
@@ -132,6 +161,45 @@ Adds per-KPI AI suggestions via OpenAI (`gpt-4o-mini`) or Claude (`claude-sonnet
 - **📝 Prompt design**: System prompt requests a senior engineering manager persona with bare JSON array output. `buildUserPrompt()` assembles metric context. `parseAiResponse()` handles clean JSON, markdown-fenced JSON, and regex extraction as fallbacks.
 - **❌ Error handling**: 401 (bad key), 429 (rate limit), network failures, malformed JSON — all surfaced in the SuggestionPanel with a retry button
 
+### 🎭 Persona System
+
+The app supports 4 personas that tailor the UI, metrics, and AI suggestions:
+
+- `'management'` — strategic, cross-project view
+- `'engineering_manager'` — full access, team + individual insights
+- `'individual'` — own metrics front & center, team comparison
+- `'delivery_manager'` — epic tracking, risk identification
+
+**Flow**: First launch → `OnboardingWizard` gates the app → user picks persona → saved to `AppConfig.persona` via electron-store → `Sidebar` filters tabs via `TAB_VISIBILITY` map → pages filter KPI cards via `PERSONA_DEFAULT_METRICS` → AI uses persona-specific system prompts.
+
+**Tab visibility** is defined in `Sidebar.tsx:TAB_VISIBILITY` — a `Record<Persona, Set<string>>` mapping each persona to its visible tab IDs.
+
+**Metric preferences** can override persona defaults. Stored as `MetricPreferences { visible: string[], hidden: string[] }` on `AppConfig.metric_preferences`.
+
+### 🏔️ Epic Tracker
+
+Groups tickets by `parent_key` (JIRA parent field) and computes delivery risk:
+
+```
+riskScore = (1 - progressPct) * 0.3    // low progress
+           + overdueRatio * 0.3         // tickets past 2x avg cycle time
+           + blockedRatio * 0.2         // blocked tickets
+           + bugRatio * 0.1             // bug type tickets
+           + reopenRatio * 0.1          // tickets reopened after resolution
+
+riskLevel: low (0-0.3), medium (0.3-0.6), high (0.6-1.0)
+```
+
+The `epic.service.ts` generates human-readable `riskFactors[]` strings for each detected issue.
+
+### 📁 Multi-Project Support
+
+`project.service.ts` provides CRUD for project configs:
+- Primary project = existing flat `AppConfig` fields (zero migration)
+- Additional projects stored in `AppConfig.projects[]` array
+- Each `ProjectConfig` has own `field_ids`, `mapping_rules`, `eng_start/end_status`
+- Cross-project metrics currently delegate to primary project (future: per-project caches)
+
 ### 📡 IPC Pattern
 
 All renderer↔main communication uses typed IPC channels defined in `shared/channels.ts`. The renderer's `api.ts` wraps IPC calls in `{ data }` to match Axios response shape. The preload script (`preload.ts`) exposes `window.api` via `contextBridge`.
@@ -159,11 +227,20 @@ Both credential stores follow the same isolation pattern:
 
 ## 🧪 Testing
 
+### 🔬 Unit Tests (Vitest)
 - 📁 Tests live in `test/main/` (services) and `src/renderer/**/__tests__/` (components/pages)
 - 🎭 Main service tests mock `electron-store` and `getConfig()` via `vi.mock()`
 - 🌐 Renderer tests use jsdom + Testing Library, mock `window.api` globally
 - 📊 Coverage thresholds: statements 90%, branches 80%, functions 85%, lines 90%
-- ✅ 466 tests across 21 test suites
+- ✅ 525 tests across 25 test suites
+
+### 🎭 E2E Tests (Playwright + Electron)
+- 🔌 Launches the **real packaged app** (`out/Uplift Forge-darwin-arm64/`) per test
+- 💾 Each test gets an **isolated `--user-data-dir`** temp directory (auto-cleaned)
+- 🔗 JIRA API calls hit a **local HTTP mock server** — zero app code changes needed
+- 📡 Tests exercise the **full IPC chain**: renderer → preload → ipcMain → services → back
+- 🧪 ~53 tests across 9 spec files covering: login, onboarding, navigation, settings, attribution, team metrics, individual metrics, epic tracker, logout/reset
+- 🏗️ Global setup auto-packages the app if stale (`npx electron-forge package`)
 
 ### 📋 Test Files
 
@@ -181,6 +258,7 @@ src/renderer/__tests__/
 src/renderer/components/__tests__/
   ⚙️ ConfigPanel.test.tsx       # Settings (all tabs + AI section)
   🤖 SuggestionPanel.test.tsx   # AI suggestion slide-out panel
+  🧙 OnboardingWizard.test.tsx  # Onboarding wizard (persona selection, project setup)
   💬 ModalDialog.test.tsx       # Reusable modal
   🔀 RuleBuilder.test.tsx       # AND/OR rule editor
   🧭 Sidebar.test.tsx           # Navigation
@@ -189,6 +267,7 @@ src/renderer/components/__tests__/
   🆕 UpdateBanner.test.tsx      # OTA update notification
 src/renderer/pages/__tests__/
   📊 EngineeringAttribution.test.tsx
+  🏔️ EpicTracker.test.tsx       # Epic tracking + risk analysis
   🧑‍💻 IndividualMetrics.test.tsx
   🔑 LoginPage.test.tsx         # Login form, consent, policy modals
   👥 TeamMetrics.test.tsx

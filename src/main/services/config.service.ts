@@ -1,5 +1,5 @@
 import Store from 'electron-store';
-import type { AppConfig, FieldIds, MappingRules, TicketFilter, TrackedEngineer } from '../../shared/types.js';
+import type { AppConfig, FieldIds, MappingRules, TicketFilter, TrackedEngineer, Persona, MetricPreferences, ProjectConfig } from '../../shared/types.js';
 
 const defaults: AppConfig = {
   project_key: '',
@@ -44,6 +44,9 @@ export function getConfig(): AppConfig {
     ticket_filter: store.get('ticket_filter'),
     sp_to_days: store.get('sp_to_days'),
     tracked_engineers: store.get('tracked_engineers'),
+    persona: store.get('persona') as Persona | undefined,
+    metric_preferences: store.get('metric_preferences') as MetricPreferences | undefined,
+    projects: store.get('projects') as ProjectConfig[] | undefined,
   };
 }
 
@@ -57,6 +60,9 @@ export interface ConfigUpdate {
   mapping_rules?: MappingRules;
   sp_to_days?: number;
   tracked_engineers?: TrackedEngineer[];
+  persona?: Persona;
+  metric_preferences?: MetricPreferences;
+  projects?: ProjectConfig[];
 }
 
 export function updateConfig(patch: ConfigUpdate): { projectKeyChanged: boolean; filterChanged: boolean; rulesChanged: boolean } {
@@ -75,6 +81,9 @@ export function updateConfig(patch: ConfigUpdate): { projectKeyChanged: boolean;
   if (patch.mapping_rules != null) store.set('mapping_rules', patch.mapping_rules);
   if (patch.sp_to_days != null) store.set('sp_to_days', Number(patch.sp_to_days));
   if (patch.tracked_engineers != null) store.set('tracked_engineers', patch.tracked_engineers);
+  if (patch.persona != null) store.set('persona', patch.persona);
+  if (patch.metric_preferences != null) store.set('metric_preferences', patch.metric_preferences);
+  if (patch.projects != null) store.set('projects', patch.projects);
 
   return { projectKeyChanged, filterChanged, rulesChanged };
 }

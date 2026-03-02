@@ -1,14 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, HelpCircle, TrendingUp, TrendingDown, Minus, Sparkles } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, Legend,
 } from 'recharts';
 import toast from 'react-hot-toast';
-import { getTeamMetrics, triggerSync, getAiConfig } from '../api';
+import { getTeamMetrics, triggerSync, getAiConfig, getConfig } from '../api';
 import SuggestionPanel from '../components/SuggestionPanel';
 import type { ProjectInfo } from '../App';
-import type { AiSuggestRequest, AiProvider } from '../../shared/types';
+import type { AiSuggestRequest, AiProvider, Persona, MetricPreferences } from '../../shared/types';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#64748b'];
 
@@ -157,12 +157,34 @@ function trendColor(key: string, direction: 'up' | 'down' | 'flat' | null, curre
   return goodUp ? 'text-rose-400' : 'text-emerald-400';
 }
 
+/** Map of KPI card helpKeys to their MetricsSummary field names */
+const KPI_CARD_KEY_TO_SUMMARY: Record<string, string> = {
+  total_tickets: 'total_tickets',
+  total_story_points: 'total_story_points',
+  total_eng_hours: 'total_eng_hours',
+  estimation_accuracy: 'estimation_accuracy',
+  avg_hours_per_sp: 'avg_eng_hours_per_sp',
+  avg_cycle_time: 'avg_cycle_time_hours',
+  bug_count: 'bug_count',
+  bug_ratio: 'bug_ratio',
+  bug_hours_pct: 'bug_eng_hours_pct',
+};
+
+/** Persona default visible metrics for TeamMetrics KPI cards */
+const PERSONA_TEAM_DEFAULTS: Record<Persona, string[]> = {
+  management: ['total_tickets', 'total_story_points', 'total_eng_hours', 'bug_ratio'],
+  engineering_manager: ['total_tickets', 'total_story_points', 'total_eng_hours', 'estimation_accuracy', 'avg_hours_per_sp', 'avg_cycle_time', 'bug_count', 'bug_ratio', 'bug_hours_pct'],
+  individual: ['total_tickets', 'total_eng_hours', 'total_story_points', 'estimation_accuracy'],
+  delivery_manager: ['total_tickets', 'total_story_points', 'total_eng_hours', 'avg_cycle_time', 'bug_count'],
+};
+
 interface TeamMetricsProps {
   refreshKey: number;
   project?: ProjectInfo | null;
+  persona?: Persona;
 }
 
-const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
+const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project, persona }) => {
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -171,6 +193,7 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
   const [aiProvider, setAiProvider] = useState<AiProvider>('openai');
   const [suggestionOpen, setSuggestionOpen] = useState(false);
   const [suggestionRequest, setSuggestionRequest] = useState<AiSuggestRequest | null>(null);
+  const [metricPrefs, setMetricPrefs] = useState<MetricPreferences | undefined>(undefined);
 
   const fetchMetrics = useCallback(async (p?: string) => {
     setLoading(true);
@@ -212,7 +235,22 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
       setAiConfigured(cfg.hasKey);
       setAiProvider(cfg.provider);
     }).catch(() => {});
-  }, []);
+    // Load metric preferences
+    getConfig().then(res => {
+      const cfg = res.data as { metric_preferences?: MetricPreferences };
+      setMetricPrefs(cfg.metric_preferences);
+    }).catch(() => {});
+  }, [refreshKey]);
+
+  /** Determine which KPI keys to show, in order */
+  const visibleKpiKeys = useMemo(() => {
+    // Custom preferences take priority
+    if (metricPrefs?.visible?.length) return metricPrefs.visible;
+    // Persona defaults
+    if (persona) return PERSONA_TEAM_DEFAULTS[persona];
+    // Fallback: all KPIs
+    return Object.keys(KPI_CARD_KEY_TO_SUMMARY);
+  }, [metricPrefs, persona]);
 
   const s = metrics?.summary;
   const ps = metrics?.prev_summary;
@@ -321,28 +359,47 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
           </div>
         ) : (
           <div className="max-w-7xl space-y-6">
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              <KpiCard label="Total Tickets" value={s.total_tickets} helpKey="total_tickets" trendKey="total_tickets" prev={ps?.total_tickets} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('total_tickets', 'Total Tickets', s.total_tickets, ps?.total_tickets)} />
-              <KpiCard label="Total Story Points" value={s.total_story_points} helpKey="total_story_points" trendKey="total_story_points" prev={ps?.total_story_points} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('total_story_points', 'Total Story Points', s.total_story_points, ps?.total_story_points)} />
-              <KpiCard label="Total Eng Hours" value={s.total_eng_hours} suffix="h" helpKey="total_eng_hours" trendKey="total_eng_hours" prev={ps?.total_eng_hours} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('total_eng_hours', 'Total Eng Hours', s.total_eng_hours, ps?.total_eng_hours)} />
-              <KpiCard
-                label="Estimation Accuracy"
-                value={s.estimation_accuracy}
-                suffix="x"
-                helpKey="estimation_accuracy"
-                trendKey="estimation_accuracy"
-                prev={ps?.estimation_accuracy}
-                color={s.estimation_accuracy === null ? undefined : s.estimation_accuracy >= 0.8 && s.estimation_accuracy <= 1.2 ? 'text-emerald-400' : 'text-rose-400'}
-                aiConfigured={aiConfigured}
-                onSuggest={() => handleSuggest('estimation_accuracy', 'Estimation Accuracy', s.estimation_accuracy, ps?.estimation_accuracy)}
-              />
-              <KpiCard label="Avg Hours / SP" value={s.avg_eng_hours_per_sp} suffix="h" helpKey="avg_hours_per_sp" trendKey="avg_hours_per_sp" prev={ps?.avg_eng_hours_per_sp} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('avg_hours_per_sp', 'Avg Hours / SP', s.avg_eng_hours_per_sp, ps?.avg_eng_hours_per_sp)} />
-              <KpiCard label="Avg Cycle Time" value={s.avg_cycle_time_hours} suffix="h" helpKey="avg_cycle_time" trendKey="avg_cycle_time" prev={ps?.avg_cycle_time_hours} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('avg_cycle_time', 'Avg Cycle Time', s.avg_cycle_time_hours, ps?.avg_cycle_time_hours)} />
-              <KpiCard label="Bug Count" value={s.bug_count} helpKey="bug_count" trendKey="bug_count" prev={ps?.bug_count} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('bug_count', 'Bug Count', s.bug_count, ps?.bug_count)} />
-              <KpiCard label="Bug Ratio" value={Math.round(s.bug_ratio * 100)} suffix="%" helpKey="bug_ratio" trendKey="bug_ratio" prev={ps?.bug_ratio != null ? Math.round(ps.bug_ratio * 100) : null} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('bug_ratio', 'Bug Ratio', s.bug_ratio, ps?.bug_ratio)} />
-              <KpiCard label="Bug Hours %" value={s.bug_eng_hours_pct} suffix="%" helpKey="bug_hours_pct" trendKey="bug_hours_pct" prev={ps?.bug_eng_hours_pct} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('bug_hours_pct', 'Bug Hours %', s.bug_eng_hours_pct, ps?.bug_eng_hours_pct)} />
-            </div>
+            {/* KPI Cards — filtered and ordered by persona/preferences */}
+            {(() => {
+              const KPI_CARD_DEFS: Record<string, { label: string; suffix?: string; getValue: (s: any) => any; getPrev: (ps: any) => any; color?: (v: any) => string | undefined }> = {
+                total_tickets: { label: 'Total Tickets', getValue: s => s.total_tickets, getPrev: ps => ps?.total_tickets },
+                total_story_points: { label: 'Total Story Points', getValue: s => s.total_story_points, getPrev: ps => ps?.total_story_points },
+                total_eng_hours: { label: 'Total Eng Hours', suffix: 'h', getValue: s => s.total_eng_hours, getPrev: ps => ps?.total_eng_hours },
+                estimation_accuracy: { label: 'Estimation Accuracy', suffix: 'x', getValue: s => s.estimation_accuracy, getPrev: ps => ps?.estimation_accuracy, color: v => v === null ? undefined : v >= 0.8 && v <= 1.2 ? 'text-emerald-400' : 'text-rose-400' },
+                avg_hours_per_sp: { label: 'Avg Hours / SP', suffix: 'h', getValue: s => s.avg_eng_hours_per_sp, getPrev: ps => ps?.avg_eng_hours_per_sp },
+                avg_cycle_time: { label: 'Avg Cycle Time', suffix: 'h', getValue: s => s.avg_cycle_time_hours, getPrev: ps => ps?.avg_cycle_time_hours },
+                bug_count: { label: 'Bug Count', getValue: s => s.bug_count, getPrev: ps => ps?.bug_count },
+                bug_ratio: { label: 'Bug Ratio', suffix: '%', getValue: s => s.bug_ratio != null ? Math.round(s.bug_ratio * 100) : null, getPrev: ps => ps?.bug_ratio != null ? Math.round(ps.bug_ratio * 100) : null },
+                bug_hours_pct: { label: 'Bug Hours %', suffix: '%', getValue: s => s.bug_eng_hours_pct, getPrev: ps => ps?.bug_eng_hours_pct },
+              };
+
+              const gridCols = visibleKpiKeys.length <= 4 ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5';
+
+              return (
+                <div className={`grid ${gridCols} gap-3`}>
+                  {visibleKpiKeys.map(key => {
+                    const def = KPI_CARD_DEFS[key];
+                    if (!def) return null;
+                    const value = def.getValue(s);
+                    const prev = def.getPrev(ps);
+                    return (
+                      <KpiCard
+                        key={key}
+                        label={def.label}
+                        value={value}
+                        suffix={def.suffix}
+                        helpKey={key}
+                        trendKey={key}
+                        prev={prev}
+                        color={def.color?.(value)}
+                        aiConfigured={aiConfigured}
+                        onSuggest={() => handleSuggest(key, def.label, value, prev)}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })()}
 
             {/* Monthly Trend */}
             {trend.length > 1 && (

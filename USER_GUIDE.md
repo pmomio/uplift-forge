@@ -10,21 +10,23 @@ Uplift Forge is a desktop app that connects to JIRA and turns ticket data into c
 
 1. [🚀 Installation](#-installation)
 2. [🔗 Connecting to JIRA](#-connecting-to-jira)
-3. [⚙️ First-Time Setup](#️-first-time-setup)
-4. [🧭 Navigation](#-navigation)
-5. [🏠 Home](#-home)
-6. [📊 Engineering Attribution](#-engineering-attribution)
-7. [👥 Team Metrics](#-team-metrics)
-8. [🧑‍💻 Individual Metrics](#-individual-metrics)
-9. [🔧 Settings](#-settings)
-   - [General](#-general)
-   - [Metrics](#-metrics-1)
-   - [Engineering Attribution Rules](#-engineering-attribution-rules)
-   - [Application Settings](#-application-settings)
-10. [🤖 AI-Powered Suggestions](#-ai-powered-suggestions)
-11. [🔄 Updating the App](#-updating-the-app)
-12. [🛡️ Privacy & Security](#️-privacy--security)
-13. [🩺 Troubleshooting](#-troubleshooting)
+3. [🎭 Onboarding & Persona Selection](#-onboarding--persona-selection)
+4. [⚙️ First-Time Setup](#️-first-time-setup)
+5. [🧭 Navigation](#-navigation)
+6. [🏠 Home](#-home)
+7. [📊 Engineering Attribution](#-engineering-attribution)
+8. [👥 Team Metrics](#-team-metrics)
+9. [🧑‍💻 Individual Metrics](#-individual-metrics)
+10. [🏔️ Epic Tracker](#️-epic-tracker)
+11. [🔧 Settings](#-settings)
+    - [General](#-general)
+    - [Metrics](#-metrics-1)
+    - [Engineering Attribution Rules](#-engineering-attribution-rules)
+    - [Application Settings](#-application-settings)
+12. [🤖 AI-Powered Suggestions](#-ai-powered-suggestions)
+13. [🔄 Updating the App](#-updating-the-app)
+14. [🛡️ Privacy & Security](#️-privacy--security)
+15. [🩺 Troubleshooting](#-troubleshooting)
 
 ---
 
@@ -64,9 +66,38 @@ Your credentials are encrypted at rest using your operating system's secure stor
 
 ---
 
+## 🎭 Onboarding & Persona Selection
+
+After your first login, an **Onboarding Wizard** 🧙‍♂️ guides you through setting up your workspace.
+
+### 📋 Steps
+
+1. **👋 Welcome** — introduction to Uplift Forge
+2. **🎭 Your Role** — pick the persona that matches how you use the tool:
+
+| Persona | Best For | What You Get |
+|---------|----------|-------------|
+| 🏢 **Management / VIP** | C-level, directors | Cross-project summaries, strategic KPIs, team health overview |
+| 👥 **Engineering Manager / VP** | Team leads managing 1-10 projects | Full metric access, individual engineer tracking, epic monitoring |
+| 🧑‍💻 **Individual Contributor** | Developers, engineers | Own performance dashboard, team average comparisons, growth insights |
+| 📋 **Delivery Manager** | Scrum masters, PMs | Epic-level tracking, risk identification, cycle time analysis |
+
+3. **🔗 Project** (new users only) — enter your JIRA project key
+4. **🎉 Ready!** — review and complete setup
+
+### 🔄 Upgrading from a Previous Version
+
+If you already had Uplift Forge installed before the persona update, you'll only be asked to pick your role. All your existing project settings, field mappings, and rules are preserved. 🛡️
+
+### ♻️ Changing Your Persona
+
+You can change your persona anytime in **Settings → General**. The sidebar tabs, visible metrics, and AI suggestion framing will update immediately. ⚡
+
+---
+
 ## ⚙️ First-Time Setup
 
-After logging in, head to **Settings** (the gear icon in the sidebar). You'll need to configure a few things before metrics work:
+After completing onboarding, head to **Settings** (the gear icon in the sidebar) if you need to configure additional options:
 
 1. 🏷️ **Set your Project Key** — e.g. `ACTIN`, `PROJ`. This is the prefix on your JIRA ticket keys.
 2. 📥 **Click Fetch Fields** — this pulls your project's custom fields and statuses from JIRA.
@@ -85,7 +116,7 @@ The sidebar on the left is your main navigation. It shows:
 
 - 🖼️ **Project avatar and name** (once configured)
 - 🏷️ **Project key** (e.g. "ACTIN")
-- 📑 **Five tabs**: Home, Eng. Attribution, Team Metrics, Individual Metrics, Settings
+- 📑 **Tabs** — filtered based on your persona (see below)
 - 📧 **Your email** (at the bottom)
 - 🚪 **Logout** — signs you out and returns to the login screen
 - 💣 **Reset App** — wipes all stored data and credentials (use with caution!)
@@ -93,13 +124,24 @@ The sidebar on the left is your main navigation. It shows:
 
 Click any tab to switch pages. The active tab is highlighted with an indigo accent. 💜
 
+### 📑 Tab Visibility by Persona
+
+| Tab | 🏢 VIP | 👥 Eng Mgr | 🧑‍💻 Individual | 📋 Delivery |
+|-----|--------|-----------|--------------|------------|
+| 🏠 Home | ✅ | ✅ | ✅ | ✅ |
+| 👥 Team Metrics | ✅ | ✅ | ❌ | ✅ |
+| 🧑‍💻 Individual Metrics | ❌ | ✅ | ✅ | ❌ |
+| 🏔️ Epic Tracker | ❌ | ✅ | ❌ | ✅ |
+| 📊 Attribution | ✅ | ✅ | ❌ | ✅ |
+| ⚙️ Settings | ✅ | ✅ | ✅ | ✅ |
+
 ---
 
 ## 🏠 Home
 
-The Home page is a getting-started guide. It shows:
+The Home page is a persona-aware landing page. It shows:
 
-- 👋 A welcome message with your project name (if configured)
+- 👋 A welcome message tailored to your role (e.g. "Executive Dashboard" for VIPs, "Your Performance Dashboard" for ICs)
 - 📋 A 4-step setup guide
 - 🃏 Feature cards explaining what the app does
 
@@ -253,11 +295,50 @@ At the bottom (if 2+ engineers are tracked), a bar chart shows all tracked engin
 
 ---
 
+## 🏔️ Epic Tracker
+
+Track epic-level delivery progress and identify risks 📊. Available for **Engineering Managers** and **Delivery Managers**.
+
+### 📋 What You See
+
+- 📊 **Summary stats** — total epics, breakdown by risk level (high 🔴, medium 🟡, low 🟢)
+- 🃏 **Epic cards** — color-coded by risk level, showing progress bars, ticket counts, and SP totals
+- ⚠️ **Risk badges** — auto-computed risk score (0.00-1.00) with level indicator
+
+### 🔍 Expanding an Epic
+
+Click any epic card to expand it. The detail section shows:
+
+- ⚠️ **Risk Factors** — human-readable descriptions of why the risk score is elevated
+- 📊 **Stats** — average cycle time, risk score, total/resolved SP
+- 📋 **Child Tickets** — a table of all tickets under this epic with status, SP, and hours
+- 🤖 **AI Risk Analysis** — click the Sparkles button to get AI-powered risk mitigation suggestions
+
+### 🧮 How Risk is Calculated
+
+The risk score combines 5 factors automatically:
+- 📉 **Progress** (30% weight) — how much work remains
+- ⏰ **Overdue tickets** (30% weight) — tickets exceeding 2x the average cycle time
+- 🚫 **Blocked tickets** (20% weight) — tickets currently in Blocked status
+- 🐛 **Bug ratio** (10% weight) — proportion of bug-type tickets
+- 🔄 **Reopened tickets** (10% weight) — tickets that were resolved but reopened
+
+Risk levels: **Low** (0-0.3) 🟢, **Medium** (0.3-0.6) 🟡, **High** (0.6-1.0) 🔴
+
+### 🔄 Syncing
+
+Click **Sync & Refresh** to re-fetch ticket data and recalculate epic progress and risk. 🔃
+
+---
+
 ## 🔧 Settings
 
 Four tabs for configuring the app. ⚙️
 
 ### 🌐 General
+
+**🎭 Persona**
+- 🎭 **Your Role** — change your persona at any time. This affects which tabs are visible, which metrics are prioritized, and how AI suggestions are framed.
 
 **🔗 JIRA Connection**
 - 🏷️ **Project Key** — your JIRA project prefix (e.g. `ACTIN`). Required.
@@ -336,6 +417,14 @@ See [🤖 AI-Powered Suggestions](#-ai-powered-suggestions) for details.
 ## 🤖 AI-Powered Suggestions
 
 Every KPI card on Team Metrics and Individual Metrics has a **✨ Sparkles** button. Clicking it opens a slide-out panel that sends the metric context to your configured AI provider and returns 2–4 actionable improvement suggestions. 🧠💡
+
+AI suggestions are **persona-aware** 🎭:
+- 🏢 **Management VIP** → strategic, organizational-level recommendations
+- 👥 **Engineering Manager** → tactical team improvement suggestions
+- 🧑‍💻 **Individual Contributor** → personal growth and skill development tips
+- 📋 **Delivery Manager** → risk mitigation and delivery-focused advice
+
+The panel header also changes based on your persona (e.g., "Strategic Insights" for VIPs, "Growth Suggestions" for ICs). ✨
 
 ### 🔧 Setup
 
