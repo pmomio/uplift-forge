@@ -176,3 +176,30 @@ export interface UpdateInfo {
   releaseNotes: string | null;
   downloadUrl: string | null;
 }
+
+// --- AI-Powered Suggestions ---
+
+export type AiProvider = 'openai' | 'claude';
+
+export interface AiConfig {
+  provider: AiProvider;
+  hasKey: boolean;
+}
+
+export interface AiSuggestRequest {
+  metricKey: string;
+  metricLabel: string;
+  currentValue: number | null;
+  previousValue: number | null;
+  trendDirection: 'up' | 'down' | 'flat' | null;
+  trendPct: number | null;
+  helpContent: string;
+  context: 'team' | 'individual';
+  engineerName?: string;
+  teamAverageValue?: number | null;
+}
+
+export interface AiSuggestResponse {
+  suggestions: string[];
+  error?: string;
+}

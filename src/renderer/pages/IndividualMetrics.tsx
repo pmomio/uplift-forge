@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, HelpCircle, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronRight } from 'lucide-react';
+import { RefreshCw, HelpCircle, TrendingUp, TrendingDown, Minus, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import toast from 'react-hot-toast';
-import { getIndividualMetrics, triggerSync } from '../api';
+import { getIndividualMetrics, triggerSync, getAiConfig } from '../api';
+import SuggestionPanel from '../components/SuggestionPanel';
 import type { ProjectInfo } from '../App';
+import type { AiSuggestRequest, AiProvider } from '../../shared/types';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#64748b'];
 
@@ -290,6 +292,10 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
   const [syncing, setSyncing] = useState(false);
   const [period, setPeriod] = useState('all');
   const [expandedEngineer, setExpandedEngineer] = useState<string | null>(null);
+  const [aiConfigured, setAiConfigured] = useState(false);
+  const [aiProvider, setAiProvider] = useState<AiProvider>('openai');
+  const [suggestionOpen, setSuggestionOpen] = useState(false);
+  const [suggestionRequest, setSuggestionRequest] = useState<AiSuggestRequest | null>(null);
 
   const fetchData = useCallback(async (p?: string) => {
     setLoading(true);
@@ -317,6 +323,34 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
   }, [fetchData]);
 
   useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
+
+  useEffect(() => {
+    getAiConfig().then(res => {
+      const cfg = res.data as { provider: AiProvider; hasKey: boolean };
+      setAiConfigured(cfg.hasKey);
+      setAiProvider(cfg.provider);
+    }).catch(() => {});
+  }, []);
+
+  const handleSuggest = useCallback((kpi: typeof KPI_DEFS[number], current: number | null | undefined, prev: number | null | undefined, engineerName?: string, teamAvgValue?: number | null) => {
+    const { direction, pct } = calcTrend(current ?? null, prev ?? null);
+    const help = kpi.help;
+    const helpContent = `${help.what}\n${help.why}\nTarget: ${help.target}`;
+
+    setSuggestionRequest({
+      metricKey: kpi.key,
+      metricLabel: kpi.label,
+      currentValue: current ?? null,
+      previousValue: prev ?? null,
+      trendDirection: direction as 'up' | 'down' | 'flat' | null,
+      trendPct: pct,
+      helpContent,
+      context: engineerName ? 'individual' : 'team',
+      engineerName,
+      teamAverageValue: teamAvgValue,
+    });
+    setSuggestionOpen(true);
+  }, []);
 
   const handlePeriodChange = (p: string) => {
     setPeriod(p);
@@ -399,7 +433,7 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
                   const prev = prevTeamAvg[kpi.key];
                   return (
                     <div key={kpi.key} className="bg-slate-800/80 px-3 py-3 text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
+                      <div className="flex items-center justify-center gap-1 mb-1 min-h-8">
                         <span className="text-[10px] text-slate-500 uppercase tracking-wider">{kpi.label}</span>
                         <HelpTooltip help={kpi.help} isLowerBetter={kpi.lowerIsBetter} isAccuracy={kpi.key === 'estimation_accuracy'} />
                       </div>
@@ -436,8 +470,8 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
                       const cmpColor = compareColor(kpi.key, val, avg, kpi.lowerIsBetter);
 
                       return (
-                        <div key={kpi.key} className="bg-slate-800/80 px-3 py-3 text-center">
-                          <div className="flex items-center justify-center gap-1 mb-1">
+                        <div key={kpi.key} className="group bg-slate-800/80 px-3 py-3 text-center relative">
+                          <div className="flex items-center justify-center gap-1 mb-1 min-h-8">
                             <span className="text-[10px] text-slate-500 uppercase tracking-wider">{kpi.label}</span>
                             <HelpTooltip help={kpi.help} isLowerBetter={kpi.lowerIsBetter} isAccuracy={kpi.key === 'estimation_accuracy'} />
                           </div>
@@ -451,6 +485,19 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
                               avg: {kpi.format(avg)}
                             </div>
                           )}
+                          {/* Sparkles - hover only, in cell padding area */}
+                          <button
+                            onClick={() => handleSuggest(kpi, val, prev, eng.displayName, avg)}
+                            disabled={!aiConfigured}
+                            className={`absolute top-0.5 right-0.5 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity ${
+                              aiConfigured
+                                ? 'text-violet-400/60 hover:text-violet-300 hover:bg-violet-500/10'
+                                : 'text-slate-600 cursor-not-allowed'
+                            }`}
+                            title={aiConfigured ? 'Get AI suggestions' : 'Configure AI in Settings first'}
+                          >
+                            <Sparkles size={11} />
+                          </button>
                         </div>
                       );
                     })}
@@ -543,6 +590,13 @@ const IndividualMetrics: React.FC<IndividualMetricsProps> = ({ refreshKey, proje
           </div>
         )}
       </div>
+
+      <SuggestionPanel
+        open={suggestionOpen}
+        onClose={() => setSuggestionOpen(false)}
+        request={suggestionRequest}
+        aiProvider={aiProvider}
+      />
     </div>
   );
 };

@@ -43,3 +43,10 @@ export const getIndividualMetrics = (period = 'all') => wrap(window.api.getIndiv
 // Update
 export const checkForUpdates = () => wrap(window.api.checkForUpdates());
 export const downloadUpdate = () => wrap(window.api.downloadUpdate());
+
+// AI Suggestions
+export const getAiConfig = () => wrap(window.api.getAiConfig());
+export const setAiConfig = (provider: string, apiKey: string) => wrap(window.api.setAiConfig(provider, apiKey));
+export const deleteAiConfig = () => wrap(window.api.deleteAiConfig());
+export const testAiConnection = () => wrap(window.api.testAiConnection());
+export const getAiSuggestions = (req: unknown) => wrap(window.api.getAiSuggestions(req));

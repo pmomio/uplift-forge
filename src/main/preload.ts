@@ -52,6 +52,13 @@ const api = {
     ipcRenderer.on(Channels.UPDATE_STATUS, listener);
     return () => ipcRenderer.removeListener(Channels.UPDATE_STATUS, listener);
   },
+
+  // AI Suggestions
+  getAiConfig: () => ipcRenderer.invoke(Channels.AI_CONFIG_GET),
+  setAiConfig: (provider: string, apiKey: string) => ipcRenderer.invoke(Channels.AI_CONFIG_SET, provider, apiKey),
+  deleteAiConfig: () => ipcRenderer.invoke(Channels.AI_CONFIG_DELETE),
+  testAiConnection: () => ipcRenderer.invoke(Channels.AI_CONFIG_TEST),
+  getAiSuggestions: (req: unknown) => ipcRenderer.invoke(Channels.AI_SUGGEST, req),
 };
 
 contextBridge.exposeInMainWorld('api', api);

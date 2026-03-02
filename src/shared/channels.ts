@@ -40,6 +40,13 @@ export const Channels = {
   UPDATE_CHECK: 'update:check',
   UPDATE_DOWNLOAD: 'update:download',
   UPDATE_STATUS: 'update:status',
+
+  // AI Suggestions
+  AI_SUGGEST: 'ai:suggest',
+  AI_CONFIG_GET: 'ai:config-get',
+  AI_CONFIG_SET: 'ai:config-set',
+  AI_CONFIG_DELETE: 'ai:config-delete',
+  AI_CONFIG_TEST: 'ai:config-test',
 } as const;
 
 export type Channel = (typeof Channels)[keyof typeof Channels];

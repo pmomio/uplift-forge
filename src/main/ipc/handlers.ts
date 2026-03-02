@@ -6,7 +6,9 @@ import * as jiraService from '../services/jira.service.js';
 import * as ticketService from '../services/ticket.service.js';
 import * as metricsService from '../services/metrics.service.js';
 import * as updateService from '../services/update.service.js';
-import type { AuthState } from '../../shared/types.js';
+import { saveAiConfig, getAiConfig, deleteAiConfig } from '../auth/ai-key-store.js';
+import * as aiService from '../services/ai.service.js';
+import type { AuthState, AiProvider, AiSuggestRequest } from '../../shared/types.js';
 
 /**
  * Register all ipcMain.handle() handlers.
@@ -130,4 +132,21 @@ export function registerIpcHandlers(): void {
   // ----- Update -----
   ipcMain.handle(Channels.UPDATE_CHECK, () => updateService.checkForUpdates());
   ipcMain.handle(Channels.UPDATE_DOWNLOAD, () => updateService.downloadUpdate());
+
+  // ----- AI Suggestions -----
+  ipcMain.handle(Channels.AI_CONFIG_GET, () => getAiConfig());
+
+  ipcMain.handle(Channels.AI_CONFIG_SET, (_event, provider: AiProvider, apiKey: string) => {
+    saveAiConfig(provider, apiKey);
+    return { status: 'success' };
+  });
+
+  ipcMain.handle(Channels.AI_CONFIG_DELETE, () => {
+    deleteAiConfig();
+    return { status: 'success' };
+  });
+
+  ipcMain.handle(Channels.AI_CONFIG_TEST, () => aiService.testAiConnection());
+
+  ipcMain.handle(Channels.AI_SUGGEST, (_event, req: AiSuggestRequest) => aiService.getAiSuggestions(req));
 }

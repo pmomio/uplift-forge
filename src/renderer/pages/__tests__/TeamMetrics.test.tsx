@@ -24,10 +24,11 @@ vi.mock('recharts', () => ({
 vi.mock('../../api', () => ({
   getTeamMetrics: vi.fn(),
   triggerSync: vi.fn(),
+  getAiConfig: vi.fn(),
 }));
 
 import TeamMetrics from '../TeamMetrics';
-import { getTeamMetrics, triggerSync } from '../../api';
+import { getTeamMetrics, triggerSync, getAiConfig } from '../../api';
 import toast from 'react-hot-toast';
 
 const mockMetrics = {
@@ -91,6 +92,7 @@ describe('TeamMetrics', () => {
     vi.clearAllMocks();
     (getTeamMetrics as ReturnType<typeof vi.fn>).mockResolvedValue({ data: mockMetrics });
     (triggerSync as ReturnType<typeof vi.fn>).mockResolvedValue({ data: {} });
+    (getAiConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { provider: 'openai', hasKey: false } });
   });
 
   // --- Loading and fetching ---

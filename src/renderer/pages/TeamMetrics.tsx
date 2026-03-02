@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, HelpCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { RefreshCw, HelpCircle, TrendingUp, TrendingDown, Minus, Sparkles } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, Legend,
 } from 'recharts';
 import toast from 'react-hot-toast';
-import { getTeamMetrics, triggerSync } from '../api';
+import { getTeamMetrics, triggerSync, getAiConfig } from '../api';
+import SuggestionPanel from '../components/SuggestionPanel';
 import type { ProjectInfo } from '../App';
+import type { AiSuggestRequest, AiProvider } from '../../shared/types';
 
 const COLORS = ['#6366f1', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#64748b'];
 
@@ -165,6 +167,10 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [period, setPeriod] = useState('all');
+  const [aiConfigured, setAiConfigured] = useState(false);
+  const [aiProvider, setAiProvider] = useState<AiProvider>('openai');
+  const [suggestionOpen, setSuggestionOpen] = useState(false);
+  const [suggestionRequest, setSuggestionRequest] = useState<AiSuggestRequest | null>(null);
 
   const fetchMetrics = useCallback(async (p?: string) => {
     setLoading(true);
@@ -199,6 +205,14 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
 
   useEffect(() => { fetchMetrics(); }, [fetchMetrics]);
   useEffect(() => { if (refreshKey > 0) fetchMetrics(); }, [refreshKey, fetchMetrics]);
+
+  useEffect(() => {
+    getAiConfig().then(res => {
+      const cfg = res.data as { provider: AiProvider; hasKey: boolean };
+      setAiConfigured(cfg.hasKey);
+      setAiProvider(cfg.provider);
+    }).catch(() => {});
+  }, []);
 
   const s = metrics?.summary;
   const ps = metrics?.prev_summary;
@@ -236,6 +250,24 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
   const typeCurr = hasSummary ? sumField(metrics.issue_type_breakdown, 'tickets') : 0;
   const typePrev = hasPrev ? sumField(metrics.prev_issue_type_breakdown, 'tickets') : 0;
   const typeTrend = hasPrev ? calcTrend(typeCurr, typePrev) : { direction: null, pct: null };
+
+  const handleSuggest = useCallback((helpKey: string, label: string, current: number | null | undefined, prev: number | null | undefined) => {
+    const { direction, pct } = calcTrend(current ?? null, prev ?? null);
+    const help = KPI_HELP[helpKey];
+    const helpContent = help ? `${help.what}\n${help.why}\nTarget: ${help.target}` : '';
+
+    setSuggestionRequest({
+      metricKey: helpKey,
+      metricLabel: label,
+      currentValue: current ?? null,
+      previousValue: prev ?? null,
+      trendDirection: direction,
+      trendPct: pct,
+      helpContent,
+      context: 'team',
+    });
+    setSuggestionOpen(true);
+  }, []);
 
   return (
     <div className="flex flex-col h-full">
@@ -291,9 +323,9 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
           <div className="max-w-7xl space-y-6">
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              <KpiCard label="Total Tickets" value={s.total_tickets} helpKey="total_tickets" trendKey="total_tickets" prev={ps?.total_tickets} />
-              <KpiCard label="Total Story Points" value={s.total_story_points} helpKey="total_story_points" trendKey="total_story_points" prev={ps?.total_story_points} />
-              <KpiCard label="Total Eng Hours" value={s.total_eng_hours} suffix="h" helpKey="total_eng_hours" trendKey="total_eng_hours" prev={ps?.total_eng_hours} />
+              <KpiCard label="Total Tickets" value={s.total_tickets} helpKey="total_tickets" trendKey="total_tickets" prev={ps?.total_tickets} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('total_tickets', 'Total Tickets', s.total_tickets, ps?.total_tickets)} />
+              <KpiCard label="Total Story Points" value={s.total_story_points} helpKey="total_story_points" trendKey="total_story_points" prev={ps?.total_story_points} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('total_story_points', 'Total Story Points', s.total_story_points, ps?.total_story_points)} />
+              <KpiCard label="Total Eng Hours" value={s.total_eng_hours} suffix="h" helpKey="total_eng_hours" trendKey="total_eng_hours" prev={ps?.total_eng_hours} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('total_eng_hours', 'Total Eng Hours', s.total_eng_hours, ps?.total_eng_hours)} />
               <KpiCard
                 label="Estimation Accuracy"
                 value={s.estimation_accuracy}
@@ -302,12 +334,14 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
                 trendKey="estimation_accuracy"
                 prev={ps?.estimation_accuracy}
                 color={s.estimation_accuracy === null ? undefined : s.estimation_accuracy >= 0.8 && s.estimation_accuracy <= 1.2 ? 'text-emerald-400' : 'text-rose-400'}
+                aiConfigured={aiConfigured}
+                onSuggest={() => handleSuggest('estimation_accuracy', 'Estimation Accuracy', s.estimation_accuracy, ps?.estimation_accuracy)}
               />
-              <KpiCard label="Avg Hours / SP" value={s.avg_eng_hours_per_sp} suffix="h" helpKey="avg_hours_per_sp" trendKey="avg_hours_per_sp" prev={ps?.avg_eng_hours_per_sp} />
-              <KpiCard label="Avg Cycle Time" value={s.avg_cycle_time_hours} suffix="h" helpKey="avg_cycle_time" trendKey="avg_cycle_time" prev={ps?.avg_cycle_time_hours} />
-              <KpiCard label="Bug Count" value={s.bug_count} helpKey="bug_count" trendKey="bug_count" prev={ps?.bug_count} />
-              <KpiCard label="Bug Ratio" value={Math.round(s.bug_ratio * 100)} suffix="%" helpKey="bug_ratio" trendKey="bug_ratio" prev={ps?.bug_ratio != null ? Math.round(ps.bug_ratio * 100) : null} />
-              <KpiCard label="Bug Hours %" value={s.bug_eng_hours_pct} suffix="%" helpKey="bug_hours_pct" trendKey="bug_hours_pct" prev={ps?.bug_eng_hours_pct} />
+              <KpiCard label="Avg Hours / SP" value={s.avg_eng_hours_per_sp} suffix="h" helpKey="avg_hours_per_sp" trendKey="avg_hours_per_sp" prev={ps?.avg_eng_hours_per_sp} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('avg_hours_per_sp', 'Avg Hours / SP', s.avg_eng_hours_per_sp, ps?.avg_eng_hours_per_sp)} />
+              <KpiCard label="Avg Cycle Time" value={s.avg_cycle_time_hours} suffix="h" helpKey="avg_cycle_time" trendKey="avg_cycle_time" prev={ps?.avg_cycle_time_hours} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('avg_cycle_time', 'Avg Cycle Time', s.avg_cycle_time_hours, ps?.avg_cycle_time_hours)} />
+              <KpiCard label="Bug Count" value={s.bug_count} helpKey="bug_count" trendKey="bug_count" prev={ps?.bug_count} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('bug_count', 'Bug Count', s.bug_count, ps?.bug_count)} />
+              <KpiCard label="Bug Ratio" value={Math.round(s.bug_ratio * 100)} suffix="%" helpKey="bug_ratio" trendKey="bug_ratio" prev={ps?.bug_ratio != null ? Math.round(ps.bug_ratio * 100) : null} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('bug_ratio', 'Bug Ratio', s.bug_ratio, ps?.bug_ratio)} />
+              <KpiCard label="Bug Hours %" value={s.bug_eng_hours_pct} suffix="%" helpKey="bug_hours_pct" trendKey="bug_hours_pct" prev={ps?.bug_eng_hours_pct} aiConfigured={aiConfigured} onSuggest={() => handleSuggest('bug_hours_pct', 'Bug Hours %', s.bug_eng_hours_pct, ps?.bug_eng_hours_pct)} />
             </div>
 
             {/* Monthly Trend */}
@@ -404,6 +438,13 @@ const TeamMetrics: React.FC<TeamMetricsProps> = ({ refreshKey, project }) => {
           </div>
         )}
       </div>
+
+      <SuggestionPanel
+        open={suggestionOpen}
+        onClose={() => setSuggestionOpen(false)}
+        request={suggestionRequest}
+        aiProvider={aiProvider}
+      />
     </div>
   );
 };
@@ -555,13 +596,28 @@ const SectionTrendBadge = ({ trend, label, currentVal, prevVal }: {
 };
 
 // --- KPI Card ---
-const KpiCard = ({ label, value, suffix, helpKey, trendKey, prev, color }: {
+const KpiCard = ({ label, value, suffix, helpKey, trendKey, prev, color, onSuggest, aiConfigured }: {
   label: string; value: any; suffix?: string; helpKey: string; trendKey: string; prev?: number | null; color?: string;
+  onSuggest?: () => void; aiConfigured?: boolean;
 }) => (
   <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex flex-col gap-1 hover:bg-slate-800/70 hover:border-slate-600/50 hover:shadow-lg hover:shadow-black/10 transition-all duration-200">
     <span className="text-xs font-medium text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
       {label}
       <HelpTooltip helpKey={helpKey} />
+      {onSuggest && (
+        <button
+          onClick={onSuggest}
+          disabled={!aiConfigured}
+          className={`ml-auto p-0.5 rounded transition-colors ${
+            aiConfigured
+              ? 'text-violet-400/60 hover:text-violet-300 hover:bg-violet-500/10'
+              : 'text-slate-600 cursor-not-allowed'
+          }`}
+          title={aiConfigured ? 'Get AI suggestions' : 'Configure AI in Settings first'}
+        >
+          <Sparkles size={13} />
+        </button>
+      )}
     </span>
     <div className="flex items-end gap-2">
       <span className={`text-2xl font-bold tabular-nums leading-none ${color || 'text-slate-100'}`}>

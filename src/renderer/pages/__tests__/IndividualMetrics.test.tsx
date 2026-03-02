@@ -18,10 +18,11 @@ vi.mock('recharts', () => ({
 vi.mock('../../api', () => ({
   getIndividualMetrics: vi.fn(),
   triggerSync: vi.fn(),
+  getAiConfig: vi.fn(),
 }));
 
 import IndividualMetrics from '../IndividualMetrics';
-import { getIndividualMetrics, triggerSync } from '../../api';
+import { getIndividualMetrics, triggerSync, getAiConfig } from '../../api';
 
 const mockData = {
   engineers: [
@@ -70,6 +71,7 @@ describe('IndividualMetrics', () => {
     vi.clearAllMocks();
     (getIndividualMetrics as ReturnType<typeof vi.fn>).mockResolvedValue({ data: mockData });
     (triggerSync as ReturnType<typeof vi.fn>).mockResolvedValue({ data: {} });
+    (getAiConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { provider: 'openai', hasKey: false } });
   });
 
   it('fetches metrics on mount', async () => {

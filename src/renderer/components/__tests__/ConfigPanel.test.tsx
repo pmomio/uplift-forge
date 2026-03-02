@@ -13,10 +13,14 @@ vi.mock('../../api', () => ({
   getJiraMembers: vi.fn(),
   checkForUpdates: vi.fn(),
   downloadUpdate: vi.fn(),
+  getAiConfig: vi.fn(),
+  setAiConfig: vi.fn(),
+  deleteAiConfig: vi.fn(),
+  testAiConnection: vi.fn(),
 }));
 
 import ConfigPanel from '../ConfigPanel';
-import { getConfig, saveConfig, getJiraFields, getJiraStatuses, getJiraMembers, checkForUpdates } from '../../api';
+import { getConfig, saveConfig, getJiraFields, getJiraStatuses, getJiraMembers, checkForUpdates, getAiConfig, setAiConfig, deleteAiConfig, testAiConnection } from '../../api';
 import toast from 'react-hot-toast';
 
 const mockConfig = {
@@ -46,6 +50,7 @@ describe('ConfigPanel', () => {
     });
     (getJiraMembers as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [] });
     (checkForUpdates as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { currentVersion: '1.0.0', updateAvailable: false } });
+    (getAiConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { provider: 'openai', hasKey: false } });
   });
 
   const switchTab = (tabName: string) => {
@@ -246,6 +251,210 @@ describe('ConfigPanel', () => {
     await waitFor(() => {
       expect(screen.getByText('Current Version')).toBeInTheDocument();
       expect(screen.getByText('Check for Updates')).toBeInTheDocument();
+    });
+  });
+
+  // --- AI-Powered Suggestions section ---
+  it('displays AI-Powered Suggestions section in Application Settings', async () => {
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => {
+      expect(screen.getByText('AI-Powered Suggestions')).toBeInTheDocument();
+    });
+  });
+
+  it('shows provider toggle buttons', async () => {
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => {
+      expect(screen.getByText('OpenAI')).toBeInTheDocument();
+      expect(screen.getByText('Claude')).toBeInTheDocument();
+    });
+  });
+
+  it('switches AI provider on toggle click', async () => {
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => expect(screen.getByText('Claude')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('Claude'));
+    // Provider label in placeholder should change to Anthropic
+    const input = document.querySelector('input[type="password"]') as HTMLInputElement;
+    expect(input?.placeholder).toContain('Anthropic');
+  });
+
+  it('shows Save Key button', async () => {
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => {
+      expect(screen.getByText('Save Key')).toBeInTheDocument();
+    });
+  });
+
+  it('shows Test Connection button', async () => {
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => {
+      expect(screen.getByText('Test Connection')).toBeInTheDocument();
+    });
+  });
+
+  it('disables Save Key button when API key input is empty', async () => {
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => screen.getByText('Save Key'));
+    const saveBtn = screen.getByText('Save Key').closest('button');
+    expect(saveBtn).toBeDisabled();
+  });
+
+  it('saves API key successfully', async () => {
+    (setAiConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ data: {} });
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => screen.getByText('Save Key'));
+    // Type an API key
+    const input = document.querySelector('input[type="password"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'sk-test-key-123' } });
+    fireEvent.click(screen.getByText('Save Key'));
+    await waitFor(() => {
+      expect(setAiConfig).toHaveBeenCalledWith('openai', 'sk-test-key-123');
+      expect(toast.success).toHaveBeenCalledWith('AI API key saved');
+    });
+  });
+
+  it('shows error toast when save fails', async () => {
+    (setAiConfig as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('fail'));
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => screen.getByText('Save Key'));
+    const input = document.querySelector('input[type="password"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'sk-test' } });
+    fireEvent.click(screen.getByText('Save Key'));
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Failed to save API key');
+    });
+  });
+
+  it('tests connection successfully', async () => {
+    (getAiConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { provider: 'openai', hasKey: true } });
+    (testAiConnection as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { success: true } });
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => screen.getByText('Test Connection'));
+    fireEvent.click(screen.getByText('Test Connection'));
+    await waitFor(() => {
+      expect(testAiConnection).toHaveBeenCalled();
+      expect(toast.success).toHaveBeenCalledWith('Connection successful!');
+    });
+  });
+
+  it('shows error when test connection fails', async () => {
+    (getAiConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { provider: 'openai', hasKey: true } });
+    (testAiConnection as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { success: false, error: 'Invalid API key.' } });
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => screen.getByText('Test Connection'));
+    fireEvent.click(screen.getByText('Test Connection'));
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Invalid API key.');
+    });
+  });
+
+  it('shows error toast when test connection throws', async () => {
+    (getAiConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { provider: 'openai', hasKey: true } });
+    (testAiConnection as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('fail'));
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => screen.getByText('Test Connection'));
+    fireEvent.click(screen.getByText('Test Connection'));
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Connection test failed');
+    });
+  });
+
+  it('disables Test Connection button when no key is saved', async () => {
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => screen.getByText('Test Connection'));
+    const testBtn = screen.getByText('Test Connection').closest('button');
+    expect(testBtn).toBeDisabled();
+  });
+
+  it('shows status indicator when key is configured', async () => {
+    (getAiConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { provider: 'openai', hasKey: true } });
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => {
+      expect(screen.getByText(/OpenAI key configured/)).toBeInTheDocument();
+    });
+  });
+
+  it('shows Remove button when key is configured', async () => {
+    (getAiConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { provider: 'openai', hasKey: true } });
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => {
+      expect(screen.getByText('Remove')).toBeInTheDocument();
+    });
+  });
+
+  it('removes API key on Remove click', async () => {
+    (getAiConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { provider: 'openai', hasKey: true } });
+    (deleteAiConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ data: {} });
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => screen.getByText('Remove'));
+    fireEvent.click(screen.getByText('Remove'));
+    await waitFor(() => {
+      expect(deleteAiConfig).toHaveBeenCalled();
+      expect(toast.success).toHaveBeenCalledWith('AI API key removed');
+    });
+  });
+
+  it('shows error toast when remove fails', async () => {
+    (getAiConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { provider: 'openai', hasKey: true } });
+    (deleteAiConfig as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('fail'));
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Application Settings'));
+    switchTab('Application Settings');
+    await waitFor(() => screen.getByText('Remove'));
+    fireEvent.click(screen.getByText('Remove'));
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Failed to remove API key');
+    });
+  });
+
+  // --- Config load error ---
+  it('shows error state when config fails to load', async () => {
+    (getConfig as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('fail'));
+    render(<ConfigPanel />);
+    await waitFor(() => {
+      expect(screen.getByText(/Failed to load configuration/)).toBeInTheDocument();
+    });
+  });
+
+  it('retries config load on retry click', async () => {
+    (getConfig as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('fail'));
+    render(<ConfigPanel />);
+    await waitFor(() => screen.getByText('Retry'));
+    (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ data: mockConfig });
+    fireEvent.click(screen.getByText('Retry'));
+    await waitFor(() => {
+      expect(getConfig).toHaveBeenCalledTimes(2);
     });
   });
 });

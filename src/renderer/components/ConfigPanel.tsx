@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Search, Calculator, Download, Filter, X, TrendingUp, BarChart3, Link, Clock, Users, Check, Settings, RefreshCw, ExternalLink } from 'lucide-react';
+import { Save, Search, Calculator, Download, Filter, X, TrendingUp, BarChart3, Link, Clock, Users, Check, Settings, RefreshCw, ExternalLink, Sparkles, Eye, EyeOff, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { getConfig, saveConfig, getJiraFields, getJiraStatuses, getJiraMembers, checkForUpdates, downloadUpdate } from '../api';
+import { getConfig, saveConfig, getJiraFields, getJiraStatuses, getJiraMembers, checkForUpdates, downloadUpdate, getAiConfig, setAiConfig, deleteAiConfig, testAiConnection } from '../api';
 import RuleBuilder from './RuleBuilder';
-import type { UpdateInfo } from '../../shared/types';
+import type { UpdateInfo, AiProvider } from '../../shared/types';
 
 interface ConfigPanelProps {
   onConfigSaved?: () => void;
@@ -40,10 +40,24 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
 
+  // AI config state
+  const [aiProvider, setAiProvider] = useState<AiProvider>('openai');
+  const [aiApiKey, setAiApiKey] = useState('');
+  const [aiHasKey, setAiHasKey] = useState(false);
+  const [aiShowKey, setAiShowKey] = useState(false);
+  const [aiSaving, setAiSaving] = useState(false);
+  const [aiTesting, setAiTesting] = useState(false);
+
   useEffect(() => {
     loadConfig();
     // Pre-load update info if available
     checkForUpdates().then(res => setUpdateInfo(res.data as UpdateInfo)).catch(() => {});
+    // Load AI config
+    getAiConfig().then(res => {
+      const cfg = res.data as { provider: AiProvider; hasKey: boolean };
+      setAiProvider(cfg.provider);
+      setAiHasKey(cfg.hasKey);
+    }).catch(() => {});
   }, []);
 
   const handleCheckForUpdates = async () => {
@@ -611,6 +625,142 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
 
             {activeTab === 'settings' && (
               <div className="space-y-8 animate-slide-up">
+                {/* AI-Powered Suggestions */}
+                <div className="space-y-4">
+                  <FeatureHeader
+                    icon={<Sparkles size={16} className="text-white" />}
+                    title="AI-Powered Suggestions"
+                    description="Connect an AI provider to get actionable improvement suggestions for your KPI metrics."
+                    color="bg-violet-500"
+                  />
+
+                  <section className="bg-violet-500/10 p-5 rounded-lg border border-violet-500/20">
+                    {/* Provider toggle */}
+                    <label className="block text-xs font-semibold text-violet-300 mb-2 uppercase tracking-wider">Provider</label>
+                    <div className="flex gap-2 mb-4">
+                      {(['openai', 'claude'] as AiProvider[]).map(p => (
+                        <button
+                          key={p}
+                          onClick={() => setAiProvider(p)}
+                          className={`px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
+                            aiProvider === p
+                              ? 'bg-violet-500/20 border-violet-500/40 text-violet-300 shadow-sm shadow-violet-500/15'
+                              : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                          }`}
+                        >
+                          {p === 'openai' ? 'OpenAI' : 'Claude'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* API Key input */}
+                    <label className="block text-xs font-semibold text-violet-300 mb-2 uppercase tracking-wider">API Key</label>
+                    <div className="flex gap-2 mb-4">
+                      <div className="relative flex-1">
+                        <input
+                          type={aiShowKey ? 'text' : 'password'}
+                          className="bg-slate-700/60 border border-slate-600/60 text-slate-100 text-sm rounded-md w-full px-3 py-2 pr-10 font-mono focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:border-violet-400/50"
+                          value={aiApiKey}
+                          onChange={(e) => setAiApiKey(e.target.value)}
+                          placeholder={aiHasKey ? '••••••••••••••••••••' : `Enter your ${aiProvider === 'openai' ? 'OpenAI' : 'Anthropic'} API key`}
+                        />
+                        <button
+                          onClick={() => setAiShowKey(!aiShowKey)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                        >
+                          {aiShowKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={async () => {
+                          if (!aiApiKey.trim()) {
+                            toast.error('Please enter an API key');
+                            return;
+                          }
+                          setAiSaving(true);
+                          try {
+                            await setAiConfig(aiProvider, aiApiKey);
+                            setAiHasKey(true);
+                            setAiApiKey('');
+                            setAiShowKey(false);
+                            toast.success('AI API key saved');
+                          } catch {
+                            toast.error('Failed to save API key');
+                          } finally {
+                            setAiSaving(false);
+                          }
+                        }}
+                        disabled={aiSaving || !aiApiKey.trim()}
+                        className="inline-flex items-center gap-2 bg-violet-500 hover:bg-violet-400 active:bg-violet-600 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-sm shadow-violet-500/20 transition-all disabled:opacity-50"
+                      >
+                        <Save size={14} />
+                        {aiSaving ? 'Saving...' : 'Save Key'}
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          if (!aiHasKey) {
+                            toast.error('Save an API key first');
+                            return;
+                          }
+                          setAiTesting(true);
+                          try {
+                            const res = await testAiConnection();
+                            const result = res.data as { success: boolean; error?: string };
+                            if (result.success) {
+                              toast.success('Connection successful!');
+                            } else {
+                              toast.error(result.error || 'Connection failed');
+                            }
+                          } catch {
+                            toast.error('Connection test failed');
+                          } finally {
+                            setAiTesting(false);
+                          }
+                        }}
+                        disabled={aiTesting || !aiHasKey}
+                        className="inline-flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium px-4 py-2 rounded-lg border border-slate-600/50 transition-all disabled:opacity-50"
+                      >
+                        <RefreshCw size={14} className={aiTesting ? 'animate-spin' : ''} />
+                        {aiTesting ? 'Testing...' : 'Test Connection'}
+                      </button>
+
+                      {aiHasKey && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              await deleteAiConfig();
+                              setAiHasKey(false);
+                              setAiApiKey('');
+                              toast.success('AI API key removed');
+                            } catch {
+                              toast.error('Failed to remove API key');
+                            }
+                          }}
+                          className="inline-flex items-center gap-2 text-rose-400 hover:text-rose-300 text-sm font-medium px-3 py-2 rounded-lg hover:bg-rose-500/10 transition-all"
+                        >
+                          <Trash2 size={14} />
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Status indicator */}
+                    {aiHasKey && (
+                      <div className="mt-4 flex items-center gap-2 text-emerald-400/80 bg-emerald-500/5 border border-emerald-500/10 px-3 py-2 rounded-md w-fit">
+                        <Check size={14} />
+                        <span className="text-[11px] font-medium uppercase tracking-wider">
+                          {aiProvider === 'openai' ? 'OpenAI' : 'Claude'} key configured
+                        </span>
+                      </div>
+                    )}
+                  </section>
+                </div>
+
                 <div className="space-y-4">
                   <FeatureHeader
                     icon={<Settings size={16} className="text-white" />}
