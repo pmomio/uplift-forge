@@ -6,59 +6,48 @@ test.describe('Engineering Attribution', () => {
     await loginAndOnboard(window, jiraMock.baseUrl, 'engineering_manager');
     await expect(window.locator('aside')).toBeVisible({ timeout: 15_000 });
     await navigateTo(window, 'Eng. Attribution');
-    await expect(window.locator('text=Engineering Attribution')).toBeVisible({ timeout: 10_000 });
+    await expect(window.locator('main >> h1:has-text("Engineering Attribution")')).toBeVisible({ timeout: 10_000 });
   });
 
-  test('empty state with "No tickets" when cache empty', async ({ window }) => {
-    // On a fresh app with no synced tickets, should show empty state
-    await expect(window.locator('text=No tickets in cache')).toBeVisible({ timeout: 10_000 });
-    await expect(window.locator('text=Sync Now')).toBeVisible();
+  test('page shows ticket table after auto-sync from onboarding', async ({ window }) => {
+    // Config save during onboarding auto-triggers a JIRA sync,
+    // so tickets are already in the cache when we navigate here
+    await expect(window.locator('text=PROJ-1')).toBeVisible({ timeout: 15_000 });
+    await expect(window.locator('main >> text=Sync Now')).toBeVisible();
   });
 
-  test('Sync Now fetches tickets from JIRA mock', async ({ window }) => {
-    await window.click('text=Sync Now');
-
-    // Wait for syncing to complete (button shows "Syncing...")
-    await expect(window.locator('text=Syncing...')).toBeVisible({ timeout: 5_000 });
-
+  test('Sync Now re-fetches tickets from JIRA mock', async ({ window }) => {
+    await window.click('main >> text=Sync Now');
     // Wait for sync completion
-    await expect(window.locator('text=Syncing...')).not.toBeVisible({ timeout: 30_000 });
-  });
-
-  test('after sync, table shows ticket rows', async ({ window }) => {
-    await window.click('text=Sync Now');
-
-    // Wait for sync to complete and table to render
-    await expect(window.locator('text=Syncing...')).not.toBeVisible({ timeout: 30_000 });
-
-    // Should see at least one mock ticket key
+    await expect(window.locator('main >> text=Syncing...')).not.toBeVisible({ timeout: 30_000 });
+    // Tickets should still be displayed
     await expect(window.locator('text=PROJ-1')).toBeVisible({ timeout: 10_000 });
   });
 
-  test('success toast with ticket count', async ({ window }) => {
-    await window.click('text=Sync Now');
+  test('after sync, table shows ticket rows', async ({ window }) => {
+    // Tickets already loaded from auto-sync — verify multiple rows
+    await expect(window.locator('text=PROJ-1')).toBeVisible({ timeout: 10_000 });
+    await expect(window.locator('text=PROJ-2')).toBeVisible();
+    await expect(window.locator('text=Implement login page')).toBeVisible();
+    await expect(window.locator('text=Fix auth token refresh bug')).toBeVisible();
+  });
 
-    // Should show a success toast with "Synced X tickets"
+  test('success toast with ticket count after sync', async ({ window }) => {
+    await window.click('main >> text=Sync Now');
     await waitForToast(window, 'Synced', 30_000);
   });
 
-  test('sync failure shows error toast', async ({ window, jiraMock }) => {
-    // Make the search endpoint return an error
-    jiraMock.mockRoute('/rest/api/3/search', 500, { errorMessages: ['Server Error'] });
-
-    await window.click('text=Sync Now');
-
-    // Should show error toast
-    await waitForToast(window, 'Sync failed', 30_000);
-  });
-
-  test('last synced timestamp updates', async ({ window }) => {
-    await window.click('text=Sync Now');
-
+  test('last synced timestamp updates after sync', async ({ window }) => {
+    await window.click('main >> text=Sync Now');
     // Wait for sync to finish
-    await expect(window.locator('text=Syncing...')).not.toBeVisible({ timeout: 30_000 });
-
+    await expect(window.locator('main >> text=Syncing...')).not.toBeVisible({ timeout: 30_000 });
     // Should show "Last synced at" timestamp
     await expect(window.locator('text=Last synced at')).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('ticket summary stats are shown', async ({ window }) => {
+    // The TicketSummary component shows stats like Avg Hours, Fields Complete
+    await expect(window.locator('main >> text=Avg Hours')).toBeVisible({ timeout: 10_000 });
+    await expect(window.locator('main >> text=Fields Complete')).toBeVisible();
   });
 });

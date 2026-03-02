@@ -91,7 +91,7 @@ test.describe('Onboarding Wizard', () => {
 
     // Should now show main app with sidebar
     await expect(window.locator('aside')).toBeVisible({ timeout: 15_000 });
-    await expect(window.locator('text=Home')).toBeVisible();
+    await expect(window.locator('aside >> text=Home')).toBeVisible();
   });
 
   test('back navigation works through all steps', async ({ window }) => {
