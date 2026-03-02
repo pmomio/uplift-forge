@@ -23,8 +23,9 @@ You connect to JIRA. Uplift Forge pulls your tickets, crunches the numbers, and 
 - **Individual Metrics** — per-engineer performance with team comparisons
 - **Smart Attribution** — rule-based classification of tickets into business units and work streams
 - **JIRA Write-back** — edit fields inline and push them straight back to JIRA
+- **AI Suggestions** — connect OpenAI or Claude to get actionable improvement suggestions for any KPI metric
 
-All data stays on your machine. Your credentials live in your OS keychain. Nothing leaves your laptop.
+All data stays on your machine. Your credentials live in your OS keychain. Nothing leaves your laptop (except JIRA API calls and optional AI provider calls).
 
 ---
 
@@ -103,6 +104,8 @@ Nine KPI cards showing your team's output:
 
 Each card shows a trend badge comparing to the previous period. Filter by **Weekly**, **Bi-weekly**, **Monthly**, or **All Time**.
 
+Each KPI card has a **Sparkles** button — click it to open the AI Suggestions panel, which sends the metric context to your configured AI provider and returns 2-4 actionable improvement suggestions.
+
 Below the cards: monthly trend charts, business unit breakdowns, work stream pie charts, and issue type distributions. Everything built with Recharts.
 
 ### Individual Metrics
@@ -122,7 +125,7 @@ Four tabs:
 - **General** — Project key, data range (1-12 months), field ID mappings, ticket filters
 - **Metrics** — Story point calibration (SP-to-days ratio) and tracked engineers
 - **Attribution** — Visual rule builder for TPD BU and Work Stream (supports AND/OR logic on parent key, labels, components, summary, etc.)
-- **Application** — Version info, manual update check
+- **Application** — AI provider setup (OpenAI / Claude), version info, manual update check
 
 ---
 

@@ -57,7 +57,9 @@ test/
 └── main/
     ├── field-engine.test.ts       # Eng hours + rule engine tests
     ├── metrics.test.ts            # Metrics computation tests
-    ├── ai.service.test.ts         # AI service tests (prompt, parsing, errors)
+    ├── ai.service.test.ts         # AI service tests (prompt, parsing, providers, errors)
+    ├── jira.service.test.ts       # JIRA API tests (auth, pagination, CRUD)
+    ├── ticket.service.test.ts     # Ticket processing, sync, members
     └── update.test.ts             # Update service tests
 ```
 
@@ -160,6 +162,40 @@ Both credential stores follow the same isolation pattern:
 - Main service tests mock `electron-store` and `getConfig()` via `vi.mock()`
 - Renderer tests use jsdom + Testing Library, mock `window.api` globally
 - Coverage thresholds: statements 90%, branches 80%, functions 85%, lines 90%
+- 466 tests across 21 test suites
+
+### Test Files
+
+```
+test/main/
+  field-engine.test.ts       # Eng hours + rule engine
+  metrics.test.ts            # Metrics computation
+  ai.service.test.ts         # AI service (prompt, parsing, providers, errors)
+  jira.service.test.ts       # JIRA API (pagination, CRUD, statuses, project)
+  ticket.service.test.ts     # Ticket caching, sync, processing, members
+  update.test.ts             # Update service
+src/renderer/__tests__/
+  App.test.tsx               # Root component (auth, routing, login/logout)
+  api.test.ts                # IPC wrapper functions
+src/renderer/components/__tests__/
+  ConfigPanel.test.tsx       # Settings (all tabs + AI section)
+  SuggestionPanel.test.tsx   # AI suggestion slide-out panel
+  ModalDialog.test.tsx       # Reusable modal
+  RuleBuilder.test.tsx       # AND/OR rule editor
+  Sidebar.test.tsx           # Navigation
+  TicketSummary.test.tsx     # Summary stats
+  TicketTable.test.tsx       # Editable ticket grid
+  UpdateBanner.test.tsx      # OTA update notification
+src/renderer/pages/__tests__/
+  EngineeringAttribution.test.tsx
+  IndividualMetrics.test.tsx
+  LoginPage.test.tsx         # Login form, consent, policy modals
+  TeamMetrics.test.tsx
+```
+
+## Workflow Rules
+
+- **Always update docs after changes**: After any code changes, update `README.md`, `CLAUDE.md`, and any relevant spec files to reflect the current state. This includes test counts, file structure, feature docs, and architecture notes.
 
 ## Conventions
 
