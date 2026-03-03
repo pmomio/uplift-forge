@@ -44,10 +44,17 @@ function getStatusFrom(item: HistoryItem): string {
  * States: idle → active → blocked → active → idle (one cycle)
  * Active time accumulates across every completed cycle.
  */
-export function calculateEngineeringHours(histories: HistoryEntry[]): number | null {
+export interface EngHoursConfig {
+  eng_start_status: string;
+  eng_end_status: string;
+  eng_excluded_statuses: string[];
+  office_hours?: OfficeHoursConfig;
+}
+
+export function calculateEngineeringHours(histories: HistoryEntry[], overrides?: EngHoursConfig): number | null {
   if (!Array.isArray(histories)) return null;
 
-  const cfg = getConfig();
+  const cfg = overrides ?? getConfig();
   const startStatus = cfg.eng_start_status.toLowerCase();
   const endStatus = cfg.eng_end_status.toLowerCase();
   const excluded = cfg.eng_excluded_statuses.map((s) => s.toLowerCase());
@@ -100,8 +107,9 @@ export function calculateEngineeringHours(histories: HistoryEntry[]): number | n
 
   if (activePeriods.length === 0) return 0;
 
+  const officeHours = overrides?.office_hours ?? getConfig().office_hours;
   const total = activePeriods.reduce(
-    (sum, [s, e]) => sum + computeOfficeHours(s, e, cfg.office_hours),
+    (sum, [s, e]) => sum + computeOfficeHours(s, e, officeHours),
     0,
   );
 
@@ -165,7 +173,7 @@ interface RuleContext {
 /**
  * Evaluate mapping rules to determine TPD BU and Work Stream.
  */
-export function getMappedFields(issue: Record<string, unknown>): [string | null, string | null] {
+export function getMappedFields(issue: Record<string, unknown>, mappingRulesOverride?: MappingRules): [string | null, string | null] {
   const fields = (issue.fields ?? {}) as Record<string, unknown>;
   const parent = (fields.parent ?? {}) as Record<string, unknown>;
   const parentFields = (parent.fields ?? {}) as Record<string, unknown>;
@@ -185,7 +193,7 @@ export function getMappedFields(issue: Record<string, unknown>): [string | null,
     assignee: (assigneeObj?.displayName as string) ?? '',
   };
 
-  const rules = getConfig().mapping_rules;
+  const rules = mappingRulesOverride ?? getConfig().mapping_rules;
   const tpdBu = matchFirstGroup(context, rules.tpd_bu ?? {});
   const workStream = matchFirstGroup(context, rules.work_stream ?? {});
 

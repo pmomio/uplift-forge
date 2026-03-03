@@ -19,10 +19,6 @@ const BUG_TYPES = new Set(['bug', 'defect']);
 
 /** Default metrics shown by persona in priority order (team-level KPIs). */
 export const PERSONA_DEFAULT_METRICS: Record<Persona, { visible: string[]; hidden: string[] }> = {
-  management: {
-    visible: ['total_tickets', 'total_story_points', 'total_eng_hours', 'bug_ratio'],
-    hidden: ['estimation_accuracy', 'avg_eng_hours_per_sp', 'avg_cycle_time_hours', 'bug_count', 'bug_eng_hours_pct'],
-  },
   engineering_manager: {
     visible: ['total_tickets', 'total_story_points', 'total_eng_hours', 'estimation_accuracy', 'avg_eng_hours_per_sp', 'avg_cycle_time_hours', 'bug_count', 'bug_ratio', 'bug_eng_hours_pct'],
     hidden: [],
@@ -152,24 +148,9 @@ function computeMetrics(tickets: ProcessedTicket[]): {
 /**
  * Compute team-level KPIs from the ticket cache.
  */
-export function getTeamMetrics(period = 'all'): TeamMetricsResponse {
-  // Get all final-status tickets (not via getTickets which applies missing_fields filter)
-  const allTicketsUnfiltered = getTickets();
-  // We need ALL final-status tickets, not just visible ones
-  // Re-fetch from source: getTickets already filters by FINAL_STATUSES but also by missing_fields
-  // For metrics, we need all final-status tickets
-  // Use getTickets but note: we actually need unfiltered list.
-  // For simplicity, getTickets returns the display-filtered list. We need the full list.
-  // The caller should pass all tickets. But since we're porting, let's match the Python behavior.
-
-  // Actually, the Python version filters by FINAL_STATUSES only (not by missing_fields).
-  // We can't access ticketCache directly from here, so we'll accept tickets as parameter or
-  // re-export from ticket.service. For now, getTickets is fine since metrics endpoint
-  // in the original Python also uses FINAL_STATUSES filter only.
-  // Let me just re-implement to match exactly.
-
-  // We need direct cache access. Import it.
-  const allTickets = allTicketsUnfiltered; // This is already FINAL_STATUSES filtered from getTickets
+export function getTeamMetrics(period = 'all', projectKey?: string): TeamMetricsResponse {
+  // Get all final-status tickets, optionally scoped by project
+  const allTickets = getTickets(projectKey);
 
   if (allTickets.length === 0) {
     return {
@@ -311,7 +292,7 @@ function computeIndividualSummary(tickets: ProcessedTicket[]): IndividualSummary
 /**
  * Compute per-engineer KPIs for tracked engineers.
  */
-export function getIndividualMetrics(period = 'all'): IndividualMetricsResponse {
+export function getIndividualMetrics(period = 'all', projectKey?: string): IndividualMetricsResponse {
   const cfg = getConfig();
   const tracked = cfg.tracked_engineers;
   if (!tracked || tracked.length === 0) {
@@ -324,7 +305,7 @@ export function getIndividualMetrics(period = 'all'): IndividualMetricsResponse 
   }
 
   const trackedNames = new Set(tracked.map((e) => e.displayName));
-  const allTickets = getTickets();
+  const allTickets = getTickets(projectKey);
 
   const today = new Date();
   const todayDate = toDateOnly(today);

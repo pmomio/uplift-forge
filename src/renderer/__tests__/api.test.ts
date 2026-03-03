@@ -7,10 +7,12 @@ const apiMethods = [
   'getConfig', 'saveConfig',
   'getJiraProject', 'getJiraFields', 'getJiraStatuses', 'getJiraMembers',
   'getTickets', 'updateTicket', 'syncSingleTicket', 'calculateHours', 'calculateFields',
-  'triggerSync',
+  'triggerSync', 'syncAllProjects',
   'getTeamMetrics', 'getIndividualMetrics',
   'checkForUpdates', 'downloadUpdate',
   'getAiConfig', 'setAiConfig', 'deleteAiConfig', 'testAiConnection', 'getAiSuggestions',
+  'listProjects', 'addProject', 'updateProject', 'removeProject', 'syncProject', 'getCrossProjectMetrics',
+  'listEpics', 'getEpicDetail', 'syncEpics',
 ];
 
 for (const method of apiMethods) {
@@ -25,10 +27,12 @@ import {
   getConfig, saveConfig,
   getJiraProject, getJiraFields, getJiraStatuses, getJiraMembers,
   getTickets, updateTicket, syncSingleTicket, calculateHours, calculateFields,
-  triggerSync,
+  triggerSync, syncAllProjects,
   getTeamMetrics, getIndividualMetrics,
   checkForUpdates, downloadUpdate,
   getAiConfig, setAiConfig, deleteAiConfig, testAiConnection, getAiSuggestions,
+  listProjects, addProject, updateProjectConfig, removeProject, syncProject, getCrossProjectMetrics,
+  listEpics, getEpicDetail, syncEpics,
 } from '../api';
 
 describe('api wrappers', () => {
@@ -128,18 +132,18 @@ describe('api wrappers', () => {
   it('wraps getTeamMetrics with default period', async () => {
     const res = await getTeamMetrics();
     expect(res).toEqual({ data: 'result' });
-    expect(mockApi.getTeamMetrics).toHaveBeenCalledWith('all');
+    expect(mockApi.getTeamMetrics).toHaveBeenCalledWith('all', undefined);
   });
 
   it('wraps getTeamMetrics with custom period', async () => {
     await getTeamMetrics('weekly');
-    expect(mockApi.getTeamMetrics).toHaveBeenCalledWith('weekly');
+    expect(mockApi.getTeamMetrics).toHaveBeenCalledWith('weekly', undefined);
   });
 
   it('wraps getIndividualMetrics with default period', async () => {
     const res = await getIndividualMetrics();
     expect(res).toEqual({ data: 'result' });
-    expect(mockApi.getIndividualMetrics).toHaveBeenCalledWith('all');
+    expect(mockApi.getIndividualMetrics).toHaveBeenCalledWith('all', undefined);
   });
 
   it('wraps checkForUpdates', async () => {
@@ -178,5 +182,87 @@ describe('api wrappers', () => {
     const res = await getAiSuggestions(req);
     expect(res).toEqual({ data: 'result' });
     expect(mockApi.getAiSuggestions).toHaveBeenCalledWith(req);
+  });
+
+  // --- Multi-project API wrappers ---
+  it('wraps syncAllProjects', async () => {
+    const res = await syncAllProjects();
+    expect(res).toEqual({ data: 'result' });
+  });
+
+  it('wraps getTickets with optional projectKey', async () => {
+    const res = await getTickets('PROJ');
+    expect(res).toEqual({ data: 'result' });
+    expect(mockApi.getTickets).toHaveBeenCalledWith('PROJ');
+  });
+
+  it('wraps triggerSync with optional projectKey', async () => {
+    const res = await triggerSync('PROJ');
+    expect(res).toEqual({ data: 'result' });
+    expect(mockApi.triggerSync).toHaveBeenCalledWith('PROJ');
+  });
+
+  it('wraps getTeamMetrics with projectKey', async () => {
+    await getTeamMetrics('all', 'PROJ');
+    expect(mockApi.getTeamMetrics).toHaveBeenCalledWith('all', 'PROJ');
+  });
+
+  it('wraps getIndividualMetrics with projectKey', async () => {
+    await getIndividualMetrics('all', 'PROJ');
+    expect(mockApi.getIndividualMetrics).toHaveBeenCalledWith('all', 'PROJ');
+  });
+
+  it('wraps listProjects', async () => {
+    const res = await listProjects();
+    expect(res).toEqual({ data: 'result' });
+  });
+
+  it('wraps addProject', async () => {
+    const proj = { project_key: 'NEW' };
+    const res = await addProject(proj);
+    expect(res).toEqual({ data: 'result' });
+    expect(mockApi.addProject).toHaveBeenCalledWith(proj);
+  });
+
+  it('wraps updateProjectConfig', async () => {
+    const res = await updateProjectConfig('PROJ', { eng_start_status: 'Dev' });
+    expect(res).toEqual({ data: 'result' });
+    expect(mockApi.updateProject).toHaveBeenCalledWith('PROJ', { eng_start_status: 'Dev' });
+  });
+
+  it('wraps removeProject', async () => {
+    const res = await removeProject('PROJ');
+    expect(res).toEqual({ data: 'result' });
+    expect(mockApi.removeProject).toHaveBeenCalledWith('PROJ');
+  });
+
+  it('wraps syncProject', async () => {
+    const res = await syncProject('PROJ');
+    expect(res).toEqual({ data: 'result' });
+    expect(mockApi.syncProject).toHaveBeenCalledWith('PROJ');
+  });
+
+  it('wraps getCrossProjectMetrics', async () => {
+    const res = await getCrossProjectMetrics('monthly');
+    expect(res).toEqual({ data: 'result' });
+    expect(mockApi.getCrossProjectMetrics).toHaveBeenCalledWith('monthly');
+  });
+
+  it('wraps listEpics with optional projectKey', async () => {
+    const res = await listEpics('PROJ');
+    expect(res).toEqual({ data: 'result' });
+    expect(mockApi.listEpics).toHaveBeenCalledWith('PROJ');
+  });
+
+  it('wraps getEpicDetail with optional projectKey', async () => {
+    const res = await getEpicDetail('EPIC-1', 'PROJ');
+    expect(res).toEqual({ data: 'result' });
+    expect(mockApi.getEpicDetail).toHaveBeenCalledWith('EPIC-1', 'PROJ');
+  });
+
+  it('wraps syncEpics with optional projectKey', async () => {
+    const res = await syncEpics('PROJ');
+    expect(res).toEqual({ data: 'result' });
+    expect(mockApi.syncEpics).toHaveBeenCalledWith('PROJ');
   });
 });

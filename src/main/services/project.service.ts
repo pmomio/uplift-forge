@@ -76,15 +76,19 @@ export function removeProject(projectKey: string): ProjectConfig[] {
 }
 
 export async function syncProject(projectKey: string): Promise<number> {
-  // For now, sync uses the primary project's sync mechanism.
-  // Future: per-project sync with scoped caches.
-  return ticketService.syncTickets();
+  return ticketService.syncTickets(projectKey);
+}
+
+/**
+ * Sync all configured projects sequentially.
+ */
+export async function syncAllProjects(): Promise<Record<string, number>> {
+  return ticketService.syncAllProjects();
 }
 
 /**
  * Aggregate metrics across all configured projects.
- * For now, returns the primary project's metrics.
- * Full cross-project aggregation would require per-project caches.
+ * Calling getTeamMetrics without projectKey aggregates all project caches.
  */
 export function getCrossProjectMetrics(period = 'all'): TeamMetricsResponse {
   return metricsService.getTeamMetrics(period);

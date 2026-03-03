@@ -226,4 +226,36 @@ describe('epic.service', () => {
       expect(detail).toBeNull();
     });
   });
+
+  describe('cross-project support', () => {
+    it('passes projectKey to getAllTickets when provided', () => {
+      mockGetAllTickets.mockReturnValue([]);
+      getEpicSummaries('PROJ-A');
+      expect(mockGetAllTickets).toHaveBeenCalledWith('PROJ-A');
+    });
+
+    it('calls getAllTickets without projectKey for cross-project aggregation', () => {
+      mockGetAllTickets.mockReturnValue([]);
+      getEpicSummaries();
+      expect(mockGetAllTickets).toHaveBeenCalledWith(undefined);
+    });
+
+    it('passes projectKey to getAllTickets in getEpicDetail', () => {
+      mockGetAllTickets.mockReturnValue([
+        makeTicket({ key: 'T-1', parent_key: 'EPIC-1', parent_summary: 'E' }),
+      ]);
+      getEpicDetail('EPIC-1', 'PROJ-B');
+      expect(mockGetAllTickets).toHaveBeenCalledWith('PROJ-B');
+    });
+
+    it('groups tickets from different project keys under same epic', () => {
+      mockGetAllTickets.mockReturnValue([
+        makeTicket({ key: 'PROJ-A-1', parent_key: 'EPIC-1', parent_summary: 'Shared Epic' }),
+        makeTicket({ key: 'PROJ-B-1', parent_key: 'EPIC-1', parent_summary: 'Shared Epic' }),
+      ]);
+      const result = getEpicSummaries();
+      expect(result).toHaveLength(1);
+      expect(result[0].childTickets).toHaveLength(2);
+    });
+  });
 });

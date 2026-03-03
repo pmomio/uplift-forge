@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { listEpics, syncEpics, getAiConfig, getAiSuggestions } from '../api';
+import { listEpics, syncEpics, getAiConfig, getAiSuggestions, syncAllProjects } from '../api';
 import type { ProjectInfo } from '../App';
-import type { EpicSummary, AiProvider } from '../../shared/types';
+import type { EpicSummary, AiProvider, Persona } from '../../shared/types';
 
 const RISK_COLORS = {
   low: { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-400', bar: 'bg-emerald-500' },
@@ -14,9 +14,12 @@ const RISK_COLORS = {
 interface EpicTrackerProps {
   refreshKey: number;
   project?: ProjectInfo | null;
+  persona?: Persona;
+  projectCount?: number;
 }
 
-const EpicTracker: React.FC<EpicTrackerProps> = ({ refreshKey, project }) => {
+const EpicTracker: React.FC<EpicTrackerProps> = ({ refreshKey, project, persona, projectCount }) => {
+  const isMultiProject = (persona === 'engineering_manager' || persona === 'management') && (projectCount ?? 1) > 1;
   const [epics, setEpics] = useState<EpicSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -41,15 +44,21 @@ const EpicTracker: React.FC<EpicTrackerProps> = ({ refreshKey, project }) => {
   const handleSync = useCallback(async () => {
     setSyncing(true);
     try {
-      const res = await syncEpics();
-      setEpics(res.data as EpicSummary[]);
+      if (isMultiProject) {
+        await syncAllProjects();
+        const res = await listEpics();
+        setEpics(res.data as EpicSummary[]);
+      } else {
+        const res = await syncEpics();
+        setEpics(res.data as EpicSummary[]);
+      }
       toast.success('Epics refreshed');
     } catch {
       toast.error('Sync failed');
     } finally {
       setSyncing(false);
     }
-  }, []);
+  }, [isMultiProject]);
 
   useEffect(() => { fetchEpics(); }, [fetchEpics]);
   useEffect(() => { if (refreshKey > 0) fetchEpics(); }, [refreshKey, fetchEpics]);
@@ -95,7 +104,7 @@ const EpicTracker: React.FC<EpicTrackerProps> = ({ refreshKey, project }) => {
       <div className="px-6 py-4 border-b border-slate-700/50 flex justify-between items-center flex-shrink-0">
         <div>
           <h1 className="text-lg font-semibold text-slate-100">
-            {project?.name ? `${project.name} — Epic Tracker` : 'Epic Tracker'}
+            {isMultiProject ? 'All Projects — Epic Tracker' : project?.name ? `${project.name} — Epic Tracker` : 'Epic Tracker'}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">Track epic progress, identify risks, and monitor delivery</p>
         </div>
@@ -149,6 +158,11 @@ const EpicTracker: React.FC<EpicTrackerProps> = ({ refreshKey, project }) => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs font-mono text-slate-500">{epic.key}</span>
+                        {isMultiProject && epic.childTickets[0]?.project_key && (
+                          <span className="px-1.5 py-0.5 bg-slate-700/60 text-slate-400 rounded text-[10px] font-mono">
+                            {epic.childTickets[0].project_key}
+                          </span>
+                        )}
                         <RiskBadge level={epic.riskLevel} score={epic.riskScore} />
                       </div>
                       <span className="text-sm font-semibold text-slate-200 block truncate">{epic.summary}</span>

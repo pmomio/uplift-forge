@@ -7,8 +7,8 @@ const BLOCKED_STATUSES = new Set(['blocked']);
 /**
  * Group tickets by parent_key and compute epic summaries with risk scores.
  */
-export function getEpicSummaries(): EpicSummary[] {
-  const allTickets = getAllTickets();
+export function getEpicSummaries(projectKey?: string): EpicSummary[] {
+  const allTickets = getAllTickets(projectKey);
 
   // Group by parent key
   const epicMap = new Map<string, { summary: string; tickets: ProcessedTicket[] }>();
@@ -68,8 +68,8 @@ export function getEpicSummaries(): EpicSummary[] {
 /**
  * Get detailed epic information for a specific epic key.
  */
-export function getEpicDetail(epicKey: string): EpicSummary | null {
-  const all = getEpicSummaries();
+export function getEpicDetail(epicKey: string, projectKey?: string): EpicSummary | null {
+  const all = getEpicSummaries(projectKey);
   return all.find(e => e.key === epicKey) ?? null;
 }
 

@@ -24,6 +24,7 @@ vi.mock('../../src/main/services/config.service.js', () => ({
 
 vi.mock('../../src/main/services/ticket.service.js', () => ({
   syncTickets: vi.fn().mockResolvedValue(10),
+  syncAllProjects: vi.fn().mockResolvedValue({ PRIM: 10, EXTRA: 5 }),
 }));
 
 vi.mock('../../src/main/services/metrics.service.js', () => ({
@@ -36,10 +37,12 @@ import {
   updateProject,
   removeProject,
   syncProject,
+  syncAllProjects,
   getCrossProjectMetrics,
 } from '../../src/main/services/project.service.js';
 import { updateConfig } from '../../src/main/services/config.service.js';
 import { syncTickets } from '../../src/main/services/ticket.service.js';
+import { syncAllProjects as ticketSyncAll } from '../../src/main/services/ticket.service.js';
 import type { ProjectConfig } from '../../src/shared/types.js';
 
 describe('project.service', () => {
@@ -123,10 +126,24 @@ describe('project.service', () => {
   });
 
   describe('syncProject', () => {
-    it('delegates to syncTickets', async () => {
+    it('delegates to syncTickets with projectKey', async () => {
       const result = await syncProject('PRIM');
-      expect(syncTickets).toHaveBeenCalled();
+      expect(syncTickets).toHaveBeenCalledWith('PRIM');
       expect(result).toBe(10);
+    });
+
+    it('passes different projectKey to syncTickets', async () => {
+      const result = await syncProject('EXTRA');
+      expect(syncTickets).toHaveBeenCalledWith('EXTRA');
+      expect(result).toBe(10);
+    });
+  });
+
+  describe('syncAllProjects', () => {
+    it('delegates to ticketService.syncAllProjects', async () => {
+      const result = await syncAllProjects();
+      expect(ticketSyncAll).toHaveBeenCalled();
+      expect(result).toEqual({ PRIM: 10, EXTRA: 5 });
     });
   });
 

@@ -5,10 +5,10 @@ import { getAiSuggestions, getConfig } from '../api';
 import type { AiSuggestRequest, AiSuggestResponse, AiProvider, Persona } from '../../shared/types';
 
 const PERSONA_PANEL_TITLES: Record<Persona, string> = {
-  management: 'Strategic Insights',
   engineering_manager: 'AI Suggestions',
   individual: 'Growth Suggestions',
   delivery_manager: 'Risk Mitigation',
+  management: 'Strategic Insights',
 };
 
 interface SuggestionPanelProps {

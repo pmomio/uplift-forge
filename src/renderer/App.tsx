@@ -3,14 +3,17 @@ import { Toaster } from 'react-hot-toast';
 import Sidebar from './components/Sidebar';
 import HomePage from './pages/HomePage';
 import EngineeringAttribution from './pages/EngineeringAttribution';
-import TeamMetrics from './pages/TeamMetrics';
-import IndividualMetrics from './pages/IndividualMetrics';
+import EmTeamDashboard from './pages/EmTeamDashboard';
+import EmIndividualDashboard from './pages/EmIndividualDashboard';
+import DmFlowDashboard from './pages/DmFlowDashboard';
+import IcPersonalDashboard from './pages/IcPersonalDashboard';
+import CtoOrgDashboard from './pages/CtoOrgDashboard';
 import EpicTracker from './pages/EpicTracker';
 import ConfigPanel from './components/ConfigPanel';
 import UpdateBanner from './components/UpdateBanner';
 import LoginPage from './pages/LoginPage';
 import OnboardingWizard from './components/OnboardingWizard';
-import { getJiraProject, getAuthState, getConfig, resetApp } from './api';
+import { getJiraProject, getAuthState, getConfig, resetApp, listProjects } from './api';
 import { Loader2 } from 'lucide-react';
 import type { Persona } from '../shared/types';
 
@@ -29,6 +32,7 @@ function App() {
   const [project, setProject] = useState<ProjectInfo | null>(null);
   const [persona, setPersona] = useState<Persona | undefined>(undefined);
   const [personaLoaded, setPersonaLoaded] = useState(false);
+  const [projectCount, setProjectCount] = useState(1);
 
   // Check auth state on mount
   useEffect(() => {
@@ -75,6 +79,14 @@ function App() {
     } catch {
       // Project info is non-critical — silently ignore
     }
+    // Also fetch project count for multi-project badge
+    try {
+      const projRes = await listProjects();
+      const projects = projRes.data as unknown[];
+      if (projects?.length) setProjectCount(projects.length);
+    } catch {
+      // Non-critical
+    }
   }, []);
 
   useEffect(() => {
@@ -104,9 +116,15 @@ function App() {
 
   const handleReset = useCallback(async () => {
     await resetApp();
+    // Full reset — clears everything (auth + config + caches).
+    // Go back to login page.
     setAuthStatus('unauthenticated');
     setAuthEmail(null);
+    setPersona(undefined);
+    setPersonaLoaded(false);
     setProject(null);
+    setActiveTab('home');
+    setProjectCount(1);
   }, []);
 
   // Global toaster — must render in all views for toasts to be visible
@@ -174,6 +192,7 @@ function App() {
         onLogout={handleLogout}
         onReset={handleReset}
         persona={persona}
+        projectCount={projectCount}
       />
 
       {/* Content */}
@@ -181,10 +200,13 @@ function App() {
         <UpdateBanner />
         <main className="flex-1 overflow-hidden pt-10 animate-fade-in">
           {activeTab === 'home' && <HomePage project={project} persona={persona} />}
-          {activeTab === 'attribution' && <EngineeringAttribution refreshKey={refreshKey} project={project} />}
-          {activeTab === 'metrics' && <TeamMetrics refreshKey={refreshKey} project={project} persona={persona} />}
-          {activeTab === 'individual' && <IndividualMetrics refreshKey={refreshKey} project={project} persona={persona} />}
-          {activeTab === 'epics' && <EpicTracker refreshKey={refreshKey} project={project} />}
+          {activeTab === 'attribution' && <EngineeringAttribution refreshKey={refreshKey} project={project} persona={persona} projectCount={projectCount} />}
+          {activeTab === 'metrics' && persona === 'engineering_manager' && <EmTeamDashboard refreshKey={refreshKey} project={project} projectCount={projectCount} />}
+          {activeTab === 'metrics' && persona === 'delivery_manager' && <DmFlowDashboard refreshKey={refreshKey} project={project} projectCount={projectCount} />}
+          {activeTab === 'metrics' && persona === 'management' && <CtoOrgDashboard refreshKey={refreshKey} project={project} projectCount={projectCount} />}
+          {activeTab === 'individual' && persona === 'engineering_manager' && <EmIndividualDashboard refreshKey={refreshKey} project={project} projectCount={projectCount} />}
+          {activeTab === 'individual' && persona === 'individual' && <IcPersonalDashboard refreshKey={refreshKey} project={project} projectCount={projectCount} />}
+          {activeTab === 'epics' && <EpicTracker refreshKey={refreshKey} project={project} persona={persona} projectCount={projectCount} />}
           {activeTab === 'config' && <ConfigPanel onConfigSaved={handleConfigSaved} />}
         </main>
       </div>

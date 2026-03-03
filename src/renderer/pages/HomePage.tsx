@@ -1,24 +1,24 @@
-import { BarChart3, Settings, Briefcase, Users, User, ClipboardList } from 'lucide-react';
+import { BarChart3, Settings } from 'lucide-react';
 import type { ProjectInfo } from '../App';
 import type { Persona } from '../../shared/types';
 import logoSrc from '../../../assets/logo.png';
 
 const PERSONA_GREETINGS: Record<Persona, { title: string; subtitle: string }> = {
-  management: {
-    title: 'Executive Dashboard',
-    subtitle: 'Cross-project performance overview with strategic KPIs and team health indicators.',
-  },
   engineering_manager: {
     title: 'Team Performance Hub',
-    subtitle: 'Deep insights across your projects. Track team output, individual growth, and continuous improvement.',
+    subtitle: 'Cross-project insights — cycle time distribution, contribution spread, rework rate, and strategic team health indicators.',
   },
   individual: {
     title: 'Your Performance Dashboard',
-    subtitle: 'Track your personal growth, compare against team averages, and identify areas for improvement.',
+    subtitle: 'Private personal metrics — track your cycle time, throughput, and growth trends over time.',
   },
   delivery_manager: {
     title: 'Delivery Command Center',
-    subtitle: 'Epic-level progress tracking, risk identification, and cycle time analysis for on-time delivery.',
+    subtitle: 'Flow metrics — CFD, lead time distribution, WIP aging, blocker analysis, and Monte Carlo forecasting.',
+  },
+  management: {
+    title: 'Organizational Health Radar',
+    subtitle: 'Cross-project delivery, quality, and efficiency metrics — bug escape rate, tech debt ratio, flow efficiency, and throughput trends.',
   },
 };
 

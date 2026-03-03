@@ -20,12 +20,12 @@ export const ALL_TABS: Tab[] = [
   { id: 'config', label: 'Settings', icon: <Settings size={18} /> },
 ];
 
-/** Tab visibility by persona — all data is still accessible via Settings */
+/** Tab visibility by persona — strict isolation, no cross-persona visibility */
 const TAB_VISIBILITY: Record<Persona, Set<string>> = {
-  management: new Set(['home', 'metrics', 'attribution', 'config']),
   engineering_manager: new Set(['home', 'attribution', 'metrics', 'individual', 'epics', 'config']),
   individual: new Set(['home', 'individual', 'config']),
   delivery_manager: new Set(['home', 'metrics', 'epics', 'attribution', 'config']),
+  management: new Set(['home', 'attribution', 'metrics', 'epics', 'config']),
 };
 
 // Backward compatible export for tests
@@ -39,9 +39,10 @@ interface SidebarProps {
   onLogout?: () => void;
   onReset?: () => void;
   persona?: Persona;
+  projectCount?: number;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, project, email, onLogout, onReset, persona }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, project, email, onLogout, onReset, persona, projectCount }) => {
   const [version, setVersion] = useState<string | null>(null);
 
   useEffect(() => {
@@ -74,7 +75,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, project, emai
             {project?.name || 'Uplift Forge'}
           </span>
           {project?.key && (
-            <span className="text-[10px] text-slate-500 font-mono">{project.key}</span>
+            <span className="text-[10px] text-slate-500 font-mono">
+              {project.key}
+              {projectCount && projectCount > 1 && (
+                <span className="ml-1.5 px-1.5 py-0.5 bg-indigo-500/15 text-indigo-400 rounded-full text-[9px] font-semibold">
+                  +{projectCount - 1}
+                </span>
+              )}
+            </span>
           )}
         </div>
       </div>

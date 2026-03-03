@@ -27,18 +27,19 @@ export const getJiraStatuses = () => wrap(window.api.getJiraStatuses());
 export const getJiraMembers = () => wrap(window.api.getJiraMembers());
 
 // Tickets
-export const getTickets = () => wrap(window.api.getTickets());
+export const getTickets = (projectKey?: string) => wrap(window.api.getTickets(projectKey));
 export const updateTicket = (key: string, fields: unknown) => wrap(window.api.updateTicket(key, fields));
 export const syncSingleTicket = (key: string) => wrap(window.api.syncSingleTicket(key));
 export const calculateHours = (key: string) => wrap(window.api.calculateHours(key));
 export const calculateFields = (key: string) => wrap(window.api.calculateFields(key));
 
 // Sync
-export const triggerSync = () => wrap(window.api.triggerSync());
+export const triggerSync = (projectKey?: string) => wrap(window.api.triggerSync(projectKey));
+export const syncAllProjects = () => wrap(window.api.syncAllProjects());
 
 // Metrics
-export const getTeamMetrics = (period = 'all') => wrap(window.api.getTeamMetrics(period));
-export const getIndividualMetrics = (period = 'all') => wrap(window.api.getIndividualMetrics(period));
+export const getTeamMetrics = (period = 'all', projectKey?: string) => wrap(window.api.getTeamMetrics(period, projectKey));
+export const getIndividualMetrics = (period = 'all', projectKey?: string) => wrap(window.api.getIndividualMetrics(period, projectKey));
 
 // Update
 export const checkForUpdates = () => wrap(window.api.checkForUpdates());
@@ -60,6 +61,17 @@ export const syncProject = (projectKey: string) => wrap(window.api.syncProject(p
 export const getCrossProjectMetrics = (period = 'all') => wrap(window.api.getCrossProjectMetrics(period));
 
 // Epics
-export const listEpics = () => wrap(window.api.listEpics());
-export const getEpicDetail = (epicKey: string) => wrap(window.api.getEpicDetail(epicKey));
-export const syncEpics = () => wrap(window.api.syncEpics());
+export const listEpics = (projectKey?: string) => wrap(window.api.listEpics(projectKey));
+export const getEpicDetail = (epicKey: string, projectKey?: string) => wrap(window.api.getEpicDetail(epicKey, projectKey));
+export const syncEpics = (projectKey?: string) => wrap(window.api.syncEpics(projectKey));
+
+// Timeline
+export const getTimelines = (projectKey?: string) => wrap(window.api.getTimelines(projectKey));
+
+// Persona-specific metrics
+export const getEmTeamMetrics = (period = 'all', projectKey?: string) => wrap(window.api.getEmTeamMetrics(period, projectKey));
+export const getEmIndividualMetrics = (period = 'all', projectKey?: string) => wrap(window.api.getEmIndividualMetrics(period, projectKey));
+export const getDmFlowMetrics = (period = 'all', projectKey?: string) => wrap(window.api.getDmFlowMetrics(period, projectKey));
+export const getDmForecastMetrics = (projectKey?: string) => wrap(window.api.getDmForecastMetrics(projectKey));
+export const getIcPersonalMetrics = (period = 'all') => wrap(window.api.getIcPersonalMetrics(period));
+export const getCtoOrgMetrics = (period = 'all') => wrap(window.api.getCtoOrgMetrics(period));

@@ -1,6 +1,6 @@
 # 🔥 Uplift Forge
 
-Engineering team performance platform. ⚡ Electron desktop app that connects to JIRA via API token auth, fetches ticket data with changelogs, and computes engineering metrics (hours, velocity, estimation accuracy, bug ratios).
+Engineering team performance platform. ⚡ Electron desktop app that connects to JIRA via API token auth, fetches ticket data with changelogs, and computes persona-specific engineering metrics using a shared Timeline Engine.
 
 ## 🏗️ Tech Stack
 
@@ -23,31 +23,40 @@ src/
 │   │   ├── token-store.ts         # 🔐 OS keychain credential storage (safeStorage)
 │   │   └── ai-key-store.ts        # 🔐 Encrypted AI API key storage (separate store)
 │   ├── ipc/
-│   │   └── handlers.ts            # 📡 All ipcMain.handle() registrations
+│   │   └── handlers.ts            # 📡 All ipcMain.handle() registrations (incl. persona guards)
 │   └── services/
-│       ├── config.service.ts      # ⚙️ AppConfig via electron-store, defaults (incl. persona, metric prefs, projects)
+│       ├── config.service.ts      # ⚙️ AppConfig via electron-store, defaults, persona migration
 │       ├── jira.service.ts        # 🔗 JIRA REST API v3 (Basic auth, /search/jql)
 │       ├── field-engine.service.ts # 🧮 Eng hours calc (state machine) + rule-based field mapping
-│       ├── ticket.service.ts      # 🎫 Ticket caching, sync, processing, JIRA write-back
-│       ├── metrics.service.ts     # 📊 Team + individual KPI computation (persona-default metrics)
+│       ├── ticket.service.ts      # 🎫 Per-project ticket caches, sync, processing, JIRA write-back
+│       ├── timeline.service.ts    # 🕐 Timeline Engine — status periods, cycle/lead time, rework, flow efficiency + shared metric helpers
+│       ├── metrics.service.ts     # 📊 Legacy team + individual KPI computation
+│       ├── em-metrics.service.ts  # 📊 EM persona metrics — cycle time dist, throughput, contribution, aging WIP, bug ratio
+│       ├── dm-metrics.service.ts  # 🌊 DM persona metrics — CFD, lead time, WIP, flow efficiency, Monte Carlo
+│       ├── ic-metrics.service.ts  # 🧑‍💻 IC persona metrics — personal cycle time, rework, goals, team comparison
+│       ├── cto-metrics.service.ts # 🏛️ Management persona metrics — cross-project throughput, cycle time, bug escape, tech debt, flow efficiency
 │       ├── ai.service.ts          # 🤖 AI suggestion service (OpenAI + Claude, persona-aware prompts)
 │       ├── epic.service.ts        # 🏔️ Epic aggregation, risk scoring, child ticket grouping
 │       ├── project.service.ts     # 📁 Multi-project CRUD, cross-project metric aggregation
 │       └── update.service.ts      # 🔄 OTA update check via GitHub Releases
 ├── renderer/                      # 🎨 React frontend
-│   ├── App.tsx                    # 🏠 Root: auth gate, persona gate, onboarding, sidebar routing
+│   ├── App.tsx                    # 🏠 Root: auth gate, persona gate, onboarding, persona-conditional routing
 │   ├── api.ts                     # 📡 IPC wrappers (mimics Axios {data} shape)
 │   ├── pages/
 │   │   ├── HomePage.tsx           # 👋 Persona-aware welcome/getting-started
 │   │   ├── LoginPage.tsx          # 🔑 API token login form
 │   │   ├── EngineeringAttribution.tsx  # 📊 Ticket table + sync
-│   │   ├── TeamMetrics.tsx        # 👥 Team KPI cards, trends, breakdowns (Recharts)
-│   │   ├── IndividualMetrics.tsx  # 🧑‍💻 Per-engineer KPIs with team comparison
+│   │   ├── EmTeamDashboard.tsx    # 📊 EM Team — cycle time, throughput, contribution, aging WIP, bug ratio
+│   │   ├── EmIndividualDashboard.tsx # 🧑‍💻 EM Individual — per-engineer cards with team avg comparison
+│   │   ├── DmFlowDashboard.tsx    # 🌊 DM Flow — CFD, lead time histogram, WIP, Monte Carlo forecast
+│   │   ├── IcPersonalDashboard.tsx # 🎯 IC Personal — cycle time trend, rework, goals, team comparison
+│   │   ├── CtoOrgDashboard.tsx    # 🏛️ Management — cross-project KPIs, traffic-light indicators, throughput trends
 │   │   └── EpicTracker.tsx        # 🏔️ Epic progress tracking + risk analysis
 │   └── components/
 │       ├── Sidebar.tsx            # 🧭 Navigation + project info (persona-filtered tabs)
-│       ├── ConfigPanel.tsx        # ⚙️ Tabbed settings (persona, project, statuses, field IDs, rules)
-│       ├── OnboardingWizard.tsx   # 🧙 Multi-step onboarding wizard (persona + project setup)
+│       ├── ConfigPanel.tsx        # ⚙️ Tabbed settings (read-only persona badge, project, statuses, fields, rules)
+│       ├── OnboardingWizard.tsx   # 🧙 Multi-step onboarding wizard (persona + project setup, multi-project for EM)
+│       ├── MetricCard.tsx         # 📊 Reusable KPI card with tooltip + explain modal + AI sparkles button
 │       ├── TicketTable.tsx        # ✏️ Editable ticket grid with calc buttons
 │       ├── TicketSummary.tsx      # 📈 Summary stats bar
 │       ├── RuleBuilder.tsx        # 🔀 AND/OR rule editor for field mapping
@@ -55,12 +64,17 @@ src/
 │       ├── SuggestionPanel.tsx    # 🤖 AI suggestion slide-out panel (persona-aware titles)
 │       └── UpdateBanner.tsx       # 🆕 OTA update notification
 └── shared/                        # 🤝 Shared between main and renderer
-    ├── types.ts                   # 📘 All TypeScript interfaces
-    └── channels.ts                # 📡 IPC channel name constants
+    ├── types.ts                   # 📘 All TypeScript interfaces (incl. TicketTimeline, persona-specific responses)
+    └── channels.ts                # 📡 IPC channel name constants (incl. persona-specific metric channels)
 test/
 └── main/
     ├── field-engine.test.ts       # 🧮 Eng hours + rule engine tests
-    ├── metrics.test.ts            # 📊 Metrics computation tests
+    ├── metrics.test.ts            # 📊 Legacy metrics computation tests
+    ├── timeline.service.test.ts   # 🕐 Timeline engine tests
+    ├── em-metrics.service.test.ts # 📊 EM metrics tests
+    ├── dm-metrics.service.test.ts # 🌊 DM metrics tests
+    ├── ic-metrics.service.test.ts # 🧑‍💻 IC metrics tests
+    ├── cto-metrics.service.test.ts # 🏛️ Management org metrics tests
     ├── ai.service.test.ts         # 🤖 AI service tests (prompt, parsing, providers, errors)
     ├── jira.service.test.ts       # 🔗 JIRA API tests (auth, pagination, CRUD)
     ├── ticket.service.test.ts     # 🎫 Ticket processing, sync, members
@@ -112,17 +126,41 @@ npm run publish        # 🚀 Publish to GitHub Releases
 ```
 🔗 JIRA REST API v3
   ↓ (getIssues with expand=changelog)
-🎫 ticket.service → processIssue()
-  ├── 🧮 field-engine: calculateEngineeringHours() ← state machine, multi-cycle
+🎫 ticket.service → processIssue(issue, storeRaw, projectKey?)
+  ├── 🧮 field-engine: calculateEngineeringHours() ← office-hours state machine
   ├── 🗺️ field-engine: getMappedFields()           ← rule-based TPD BU + Work Stream
-  └── 💾 caches ProcessedTicket in memory + electron-store
+  ├── 📦 extracts: assignee_id, sprint_id, sprint_name, components
+  └── 💾 caches ProcessedTicket + raw issue in per-project caches
         ↓
-  📊 metrics.service reads from ticket cache
-  ├── computeMetrics()            → team KPIs
-  └── computeIndividualSummary()  → per-engineer KPIs
+  🕐 timeline.service extracts TicketTimeline from raw changelog
+  ├── StatusPeriod[] with category (active/wait/blocked/done)
+  ├── cycleTimeHours, leadTimeHours, flowEfficiency
+  ├── rework detection (backward transitions)
+  └── daysInCurrentStatus (for aging WIP)
         ↓
-  🎨 renderer pages via IPC (window.api → ipcMain.handle)
+  📊 Persona-specific metric services read from timelines + ticket cache
+  ├── em-metrics.service → EM team + individual (scoped to tracked engineers)
+  ├── dm-metrics.service → DM flow metrics + Monte Carlo forecast
+  └── ic-metrics.service → IC personal metrics (filtered to my_account_id)
+        ↓
+  🎨 Persona-specific dashboard pages via IPC (window.api → ipcMain.handle)
+  ├── EmTeamDashboard, EmIndividualDashboard   ← engineering_manager
+  ├── DmFlowDashboard                          ← delivery_manager
+  └── IcPersonalDashboard                      ← individual
 ```
+
+### 🕐 Timeline Engine
+
+Separate from engineering hours (office-hours-based), the Timeline Engine in `timeline.service.ts` extracts richer flow data from JIRA changelogs using **calendar time**:
+
+- 📊 **Status Periods** — every period a ticket spent in each status, with duration and category
+- ⏱️ **Cycle Time** — first active status to done (calendar hours)
+- 📏 **Lead Time** — created to done (calendar hours)
+- 🌊 **Flow Efficiency** — active time / lead time × 100
+- 🔁 **Rework Detection** — backward transitions in status order
+- ⏳ **Days in Current Status** — for aging WIP detection
+
+Status classification is configurable: Active Statuses, Blocked Statuses, Done Statuses.
 
 ### ⏱️ Engineering Hours Calculation
 
@@ -143,14 +181,93 @@ State machine in `field-engine.service.ts:calculateEngineeringHours()`:
 - `eng_excluded_statuses`: ["Blocked"]
 - `office_hours`: 09:00–18:00 Europe/Berlin, weekends excluded
 - `sp_to_days`: 1 (story point = 1 day = 8 hours for estimation accuracy)
+- `active_statuses`: ["In Progress", "Code Review", "QA"]
+- `blocked_statuses`: ["Blocked"]
+- `done_statuses`: ["Done", "Resolved", "Closed", "Rejected", "Cancelled"]
 
-### 📊 Metrics KPIs
+### 📊 Persona-Specific Metrics
 
-**👥 Team**: total tickets, story points, eng hours, estimation accuracy (ratio to 1.0), avg hours/SP, avg cycle time, bug count, bug ratio, bug hours %
+**📊 EM Team Dashboard** (`em-metrics.service.ts → EmTeamDashboard.tsx`):
+- Cycle time distribution (p50/p85/p95 with 4-week trend)
+- Throughput by work stream
+- Weekly throughput (8 weeks)
+- Contribution spread (per-engineer SP, normalized)
+- Aging WIP (warning/critical/escalation tiers)
+- Bug ratio by engineer
+- Rework rate
+- 🎯 SP estimation accuracy (actual eng hours vs estimated SP × sp_to_days × 8h)
+- ✅ First-time pass rate (complement of rework rate)
+- ⏱️ Avg code review duration (time in review statuses)
+- 📊 Work type distribution (horizontal bar by issue type)
+- 📋 Unestimated ticket ratio (% of resolved tickets with no SP)
+- 🔀 Lead time breakdown (active vs wait vs blocked %)
+- 🔒 **Scoped to tracked engineers** — when `tracked_engineers` is configured, all metrics only include those engineers
 
-**🧑‍💻 Individual**: same + complexity score (avg SP/ticket), focus ratio (product work %)
+**🧑‍💻 EM Individual Dashboard** (`em-metrics.service.ts → EmIndividualDashboard.tsx`):
+- Per-engineer cards: cycle time p50/p85, rework rate, bug ratio, SP accuracy, first-time pass rate, complexity, focus ratio
+- Team averages bar for comparison (includes SP accuracy + first-time pass rate)
+- Color-coded vs team average (green = better, red = worse)
+- 🔒 Filtered to tracked engineers only
 
-**🎨 Trend colors**: estimation_accuracy is special — closer to 1.0 is better regardless of up/down direction. Other metrics use `LOWER_IS_BETTER` set for bug/cycle/hours-per-SP metrics.
+**🌊 DM Flow Dashboard** (`dm-metrics.service.ts → DmFlowDashboard.tsx`):
+- Cumulative Flow Diagram (30-day stacked area chart)
+- Lead time distribution (p50/p85/p95 + histogram)
+- WIP count vs configurable limit
+- Aging WIP (3 tiers: warning/critical/escalation)
+- Blocker duration (top blocked tickets)
+- Flow efficiency (average + median)
+- Throughput stability (1 - stddev/mean)
+- Monte Carlo forecast (10,000 simulations, 50/85/95% confidence)
+- 🔄 Arrival vs departure rate (12-week dual-line chart)
+- 📦 Batch size trend (avg SP/ticket per week, 12 weeks)
+- ⏱️ Time to first activity (created → first active status)
+- 🔀 Lead time breakdown (active vs wait vs blocked %)
+
+**🎯 IC Personal Dashboard** (`ic-metrics.service.ts → IcPersonalDashboard.tsx`):
+- Cycle time trend (weekly p50 over 8 weeks)
+- Weekly throughput
+- Time in each status (percentage breakdown)
+- Scope trajectory (avg SP/ticket by month)
+- My aging WIP
+- Rework rate + trend
+- Team comparison (opt-in, anonymous medians)
+- Goal progress (vs personal targets)
+- 🎯 SP estimation accuracy (personal)
+- ✅ First-time pass rate (personal)
+- ⏱️ Code review wait time (avg hours in review statuses)
+- 🎯 Focus score (% product work vs bugs/maintenance)
+- 🔒 All data filtered to `my_account_id`
+
+**🏛️ Management Org Dashboard** (`cto-metrics.service.ts → CtoOrgDashboard.tsx`):
+- Cross-project throughput trends (multi-line chart)
+- Cycle time p85 by project (horizontal bar)
+- Bug escape rate (with traffic light indicator)
+- Tech debt ratio (with traffic light indicator)
+- Flow efficiency (with traffic light indicator)
+- Headcount-normalized throughput (tickets per tracked engineer)
+- Weekly aggregate throughput
+- 📊 Delivery predictability (CoV of cycle time per project, color-coded)
+- 📊 Work type distribution by project (stacked horizontal bars)
+
+### 📊 MetricCard Component
+
+All persona dashboards use shared `MetricCard` and `SectionTitle` components from `components/MetricCard.tsx`:
+
+- **MetricCard**: KPI card with value + icon + help tooltip + 📖 explain button + AI sparkles button
+- **SectionTitle**: Chart section header with help tooltip + 📖 explain button + optional AI sparkles button
+- **ExplainModal**: Portal-rendered lightweight modal showing metric derivation (data source, computation, filters, config dependency)
+- **Tooltip**: Shows "What it is" (description) + "High-Performing Target" (benchmark value)
+- **📖 Explain Button**: `BookOpen` icon (13px) — opens `ExplainModal` with full derivation methodology. Supports **dynamic computation traces** via `dynamicDerivation` prop — when available, shows real computation pipeline with actual values (ticket counts, filter results, intermediate calculations) instead of static descriptions. Falls back to `MetricTooltip.derivation` when traces unavailable. Custom inline `IcExplainButton`/`CtoExplainButton` helpers handle non-standard card patterns (IC health cards, CTO traffic-light cards). EM Individual uses upgraded `CardHelp` component with `{ text, derivation, dynamicDerivation }` objects.
+- **AI Sparkles**: Opens `SuggestionPanel` slide-out with metric context for AI-powered suggestions
+
+### 🔬 Dynamic Computation Traces
+
+Each persona-specific metric response includes an optional `traces?: Record<string, string>` field. Backend services build human-readable trace strings during computation with real numbers. The frontend prefers dynamic traces over static derivation fallback via the `dynamicDerivation` prop pattern:
+
+- **Backend**: Each service declares `const traces: Record<string, string> = {};`, builds trace strings after each computation step, and adds `traces` to the response object
+- **Frontend**: `dynamicDerivation={data?.traces?.keyName}` on MetricCard/SectionTitle/custom explain buttons. Falls back to `tooltip.derivation` when traces are `undefined`
+- **Trace keys per service**: EM team (totalTickets, cycleTimeP50, reworkRate, spAccuracy, avgReviewDuration, unestimatedRatio), EM individual (teamAvg), DM flow (leadTimeP50, flowEfficiency, wip, throughputStability, monteCarlo), IC personal (cycleTimeP50, reworkRate, tickets, spAccuracy, firstTimePassRate, avgReviewWait, focusScore, teamComparison), CTO org (totalTickets, bugEscapeRate, techDebtRatio, flowEfficiency, headcount)
+- **No new IPC channels needed** — traces travel inside existing response objects
 
 ### 🤖 AI-Powered Suggestions
 
@@ -163,18 +280,32 @@ Adds per-KPI AI suggestions via OpenAI (`gpt-4o-mini`) or Claude (`claude-sonnet
 
 ### 🎭 Persona System
 
-The app supports 4 personas that tailor the UI, metrics, and AI suggestions:
+The app supports 4 personas with genuinely different metrics, backed by a shared Timeline Engine:
 
-- `'management'` — strategic, cross-project view
-- `'engineering_manager'` — full access, team + individual insights
-- `'individual'` — own metrics front & center, team comparison
-- `'delivery_manager'` — epic tracking, risk identification
+- `'engineering_manager'` — full access: team + individual metrics, multi-project support 🌐
+- `'delivery_manager'` — flow dashboard: CFD, lead time, WIP, Monte Carlo forecast 🌊
+- `'individual'` — private personal dashboard: cycle time, rework, goals, team comparison 🎯
+- `'management'` — org health radar: cross-project throughput, cycle time comparison, bug escape rate, tech debt ratio, flow efficiency 🏛️
 
-**Flow**: First launch → `OnboardingWizard` gates the app → user picks persona → saved to `AppConfig.persona` via electron-store → `Sidebar` filters tabs via `TAB_VISIBILITY` map → pages filter KPI cards via `PERSONA_DEFAULT_METRICS` → AI uses persona-specific system prompts.
+**🔒 Persona Immutability**: Persona is set once during onboarding and cannot be changed in Settings. To change persona, use "Reset App" in the sidebar.
 
-**Tab visibility** is defined in `Sidebar.tsx:TAB_VISIBILITY` — a `Record<Persona, Set<string>>` mapping each persona to its visible tab IDs.
+**🔒 Persona Isolation**: Each persona's IPC metric endpoints check `getConfig().persona` before returning data. If persona doesn't match the endpoint, an error is returned. The renderer only renders its own persona's dashboard pages.
 
-**Metric preferences** can override persona defaults. Stored as `MetricPreferences { visible: string[], hidden: string[] }` on `AppConfig.metric_preferences`.
+**Flow**: First launch → `OnboardingWizard` gates the app → user picks persona (with "permanent choice" warning) → saved to `AppConfig.persona` → `Sidebar` filters tabs via `TAB_VISIBILITY` → `App.tsx` routes to persona-specific dashboard pages → AI uses persona-specific system prompts.
+
+**Tab visibility** is defined in `Sidebar.tsx:TAB_VISIBILITY`:
+- EM sees all 6 tabs (home, attribution, metrics, individual, epics, config)
+- DM sees 5 tabs (home, attribution, metrics, epics, config)
+- IC sees 3 tabs (home, individual, config)
+- Management sees 5 tabs (home, attribution, metrics, epics, config) — no individual
+
+**App.tsx routing** (strict persona isolation):
+```tsx
+{activeTab === 'metrics' && persona === 'engineering_manager' && <EmTeamDashboard />}
+{activeTab === 'metrics' && persona === 'delivery_manager' && <DmFlowDashboard />}
+{activeTab === 'individual' && persona === 'engineering_manager' && <EmIndividualDashboard />}
+{activeTab === 'individual' && persona === 'individual' && <IcPersonalDashboard />}
+```
 
 ### 🏔️ Epic Tracker
 
@@ -194,15 +325,44 @@ The `epic.service.ts` generates human-readable `riskFactors[]` strings for each 
 
 ### 📁 Multi-Project Support
 
-`project.service.ts` provides CRUD for project configs:
+`project.service.ts` provides CRUD for project configs, `ticket.service.ts` provides per-project caching:
+
+**📋 Config layer:**
 - Primary project = existing flat `AppConfig` fields (zero migration)
 - Additional projects stored in `AppConfig.projects[]` array
 - Each `ProjectConfig` has own `field_ids`, `mapping_rules`, `eng_start/end_status`
-- Cross-project metrics currently delegate to primary project (future: per-project caches)
+
+**💾 Data layer (per-project ticket caches):**
+- `projectTicketCaches: Map<string, Map<string, ProcessedTicket>>` — keyed by project key
+- `projectRawCaches: Map<string, Map<string, Record<string, unknown>>>` — raw JIRA data per project
+- `electron-store` persists under `{ projects: { [projectKey]: { ticketCache, rawIssueCache } } }`
+- Auto-migration: old flat cache format detected and wrapped under primary project key on first load
+- `syncTickets(projectKey?)` — syncs one project; `syncAllProjects()` — syncs all configured projects
+- `getTickets(projectKey?)` — with key returns single project; without returns all projects aggregated
+- `processIssue(issue, storeRaw?, projectKey?)` — sets `ticket.project_key` and stores in correct sub-cache
+- `resolveProjectConfig(projectKey)` — resolves field_ids, mapping_rules, statuses from primary or projects[]
+- Metrics, epics, and attribution all accept optional `projectKey` for scoped or aggregated results
+
+**🌐 EM persona gets full cross-project experience:**
+- All 6 tabs visible (home, attribution, metrics, individual, epics, config)
+- OnboardingWizard shows multi-project key input
+- Settings shows project management UI
+- All data pages show aggregated data across projects
+- Sync buttons call `syncAllProjects()` for EM with multiple projects
 
 ### 📡 IPC Pattern
 
 All renderer↔main communication uses typed IPC channels defined in `shared/channels.ts`. The renderer's `api.ts` wraps IPC calls in `{ data }` to match Axios response shape. The preload script (`preload.ts`) exposes `window.api` via `contextBridge`.
+
+**Persona-specific metric channels** (with persona guards):
+- `METRICS_EM_TEAM` → `getEmTeamMetrics(period, projectKey?)` — EM only
+- `METRICS_EM_INDIVIDUAL` → `getEmIndividualMetrics(period, projectKey?)` — EM only
+- `METRICS_DM_FLOW` → `getDmFlowMetrics(period, projectKey?)` — DM only
+- `METRICS_DM_FORECAST` → `getDmFlowMetrics('all', projectKey?)` — DM only
+- `METRICS_IC_PERSONAL` → `getIcPersonalMetrics(period)` — IC only
+- `TIMELINE_LIST` → `getTimelines(projectKey?)`
+
+**Legacy channels** still available: `METRICS_TEAM`, `METRICS_INDIVIDUAL`, `TICKETS_LIST`, `EPICS_LIST`, `SYNC_ALL_PROJECTS`.
 
 ## 🔐 Security: API Key Isolation
 
@@ -232,7 +392,7 @@ Both credential stores follow the same isolation pattern:
 - 🎭 Main service tests mock `electron-store` and `getConfig()` via `vi.mock()`
 - 🌐 Renderer tests use jsdom + Testing Library, mock `window.api` globally
 - 📊 Coverage thresholds: statements 90%, branches 80%, functions 85%, lines 90%
-- ✅ 525 tests across 25 test suites
+- ✅ 672 tests across 33 test suites
 
 ### 🎭 E2E Tests (Playwright + Electron)
 - 🔌 Launches the **real packaged app** (`out/Uplift Forge-darwin-arm64/`) per test
@@ -247,13 +407,19 @@ Both credential stores follow the same isolation pattern:
 ```
 test/main/
   🧮 field-engine.test.ts       # Eng hours + rule engine
-  📊 metrics.test.ts            # Metrics computation
+  📊 metrics.test.ts            # Legacy metrics computation
+  🕐 timeline.service.test.ts   # Timeline engine (status periods, cycle/lead time, rework)
+  📊 em-metrics.service.test.ts # EM team + individual metrics
+  🌊 dm-metrics.service.test.ts # DM flow metrics + Monte Carlo
+  🧑‍💻 ic-metrics.service.test.ts # IC personal metrics
   🤖 ai.service.test.ts         # AI service (prompt, parsing, providers, errors)
   🔗 jira.service.test.ts       # JIRA API (pagination, CRUD, statuses, project)
   🎫 ticket.service.test.ts     # Ticket caching, sync, processing, members
+  🏔️ epic.service.test.ts       # Epic aggregation + risk scoring
+  📁 project.service.test.ts    # Multi-project CRUD
   🔄 update.test.ts             # Update service
 src/renderer/__tests__/
-  🏠 App.test.tsx               # Root component (auth, routing, login/logout)
+  🏠 App.test.tsx               # Root component (auth, routing, persona routing, login/logout)
   📡 api.test.ts                # IPC wrapper functions
 src/renderer/components/__tests__/
   ⚙️ ConfigPanel.test.tsx       # Settings (all tabs + AI section)
@@ -268,9 +434,12 @@ src/renderer/components/__tests__/
 src/renderer/pages/__tests__/
   📊 EngineeringAttribution.test.tsx
   🏔️ EpicTracker.test.tsx       # Epic tracking + risk analysis
-  🧑‍💻 IndividualMetrics.test.tsx
+  📊 EmTeamDashboard.test.tsx   # EM team dashboard KPIs + sync
+  🧑‍💻 EmIndividualDashboard.test.tsx # EM individual engineer cards
+  🌊 DmFlowDashboard.test.tsx   # DM flow dashboard + Monte Carlo
+  🎯 IcPersonalDashboard.test.tsx # IC personal dashboard + goals
+  🏛️ CtoOrgDashboard.test.tsx   # Management org dashboard KPIs + charts
   🔑 LoginPage.test.tsx         # Login form, consent, policy modals
-  👥 TeamMetrics.test.tsx
 ```
 
 ## 📜 Workflow Rules
@@ -284,3 +453,5 @@ src/renderer/pages/__tests__/
 - ❓ Null means "not available/computable"; use `== null` checks (not strict equality)
 - 🏷️ `has_computed_values` flag on tickets indicates computed vs JIRA-native values
 - 🔄 Config changes trigger either full sync (project key/filter change) or cache reprocessing (rule changes only)
+- 🔒 Persona guards: all persona-specific IPC handlers check `getConfig().persona` before returning data
+- 📊 Tracked engineers: EM team metrics scope all data to `tracked_engineers` when configured (empty = show all)

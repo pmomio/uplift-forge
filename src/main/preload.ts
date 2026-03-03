@@ -28,18 +28,19 @@ const api = {
   getJiraMembers: () => ipcRenderer.invoke(Channels.JIRA_MEMBERS),
 
   // Tickets
-  getTickets: () => ipcRenderer.invoke(Channels.TICKETS_LIST),
+  getTickets: (projectKey?: string) => ipcRenderer.invoke(Channels.TICKETS_LIST, projectKey),
   updateTicket: (key: string, fields: unknown) => ipcRenderer.invoke(Channels.TICKETS_UPDATE, key, fields),
   syncSingleTicket: (key: string) => ipcRenderer.invoke(Channels.TICKETS_SYNC_ONE, key),
   calculateHours: (key: string) => ipcRenderer.invoke(Channels.TICKETS_CALC_HOURS, key),
   calculateFields: (key: string) => ipcRenderer.invoke(Channels.TICKETS_CALC_FIELDS, key),
 
   // Sync
-  triggerSync: () => ipcRenderer.invoke(Channels.SYNC_FULL),
+  triggerSync: (projectKey?: string) => ipcRenderer.invoke(Channels.SYNC_FULL, projectKey),
+  syncAllProjects: () => ipcRenderer.invoke(Channels.SYNC_ALL_PROJECTS),
 
   // Metrics
-  getTeamMetrics: (period: string) => ipcRenderer.invoke(Channels.METRICS_TEAM, period),
-  getIndividualMetrics: (period: string) => ipcRenderer.invoke(Channels.METRICS_INDIVIDUAL, period),
+  getTeamMetrics: (period: string, projectKey?: string) => ipcRenderer.invoke(Channels.METRICS_TEAM, period, projectKey),
+  getIndividualMetrics: (period: string, projectKey?: string) => ipcRenderer.invoke(Channels.METRICS_INDIVIDUAL, period, projectKey),
 
   // Shell
   openExternal: (url: string) => ipcRenderer.invoke(Channels.OPEN_EXTERNAL, url),
@@ -69,9 +70,20 @@ const api = {
   getCrossProjectMetrics: (period: string) => ipcRenderer.invoke(Channels.METRICS_CROSS_PROJECT, period),
 
   // Epics
-  listEpics: () => ipcRenderer.invoke(Channels.EPICS_LIST),
-  getEpicDetail: (epicKey: string) => ipcRenderer.invoke(Channels.EPIC_DETAIL, epicKey),
-  syncEpics: () => ipcRenderer.invoke(Channels.EPICS_SYNC),
+  listEpics: (projectKey?: string) => ipcRenderer.invoke(Channels.EPICS_LIST, projectKey),
+  getEpicDetail: (epicKey: string, projectKey?: string) => ipcRenderer.invoke(Channels.EPIC_DETAIL, epicKey, projectKey),
+  syncEpics: (projectKey?: string) => ipcRenderer.invoke(Channels.EPICS_SYNC, projectKey),
+
+  // Timeline
+  getTimelines: (projectKey?: string) => ipcRenderer.invoke(Channels.TIMELINE_LIST, projectKey),
+
+  // Persona-specific metrics
+  getEmTeamMetrics: (period: string, projectKey?: string) => ipcRenderer.invoke(Channels.METRICS_EM_TEAM, period, projectKey),
+  getEmIndividualMetrics: (period: string, projectKey?: string) => ipcRenderer.invoke(Channels.METRICS_EM_INDIVIDUAL, period, projectKey),
+  getDmFlowMetrics: (period: string, projectKey?: string) => ipcRenderer.invoke(Channels.METRICS_DM_FLOW, period, projectKey),
+  getDmForecastMetrics: (projectKey?: string) => ipcRenderer.invoke(Channels.METRICS_DM_FORECAST, projectKey),
+  getIcPersonalMetrics: (period: string) => ipcRenderer.invoke(Channels.METRICS_IC_PERSONAL, period),
+  getCtoOrgMetrics: (period: string) => ipcRenderer.invoke(Channels.METRICS_CTO_ORG, period),
 };
 
 contextBridge.exposeInMainWorld('api', api);

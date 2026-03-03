@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Search, Calculator, Download, Filter, X, TrendingUp, BarChart3, Link, Clock, Users, Check, Settings, RefreshCw, ExternalLink, Sparkles, Eye, EyeOff, Trash2, Briefcase, User, ClipboardList } from 'lucide-react';
+import { Save, Search, Calculator, Download, Filter, X, TrendingUp, BarChart3, Link, Clock, Users, Check, Settings, RefreshCw, ExternalLink, Sparkles, Eye, EyeOff, Trash2, User, ClipboardList, Building2, Plus, FolderOpen, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { getConfig, saveConfig, getJiraFields, getJiraStatuses, getJiraMembers, checkForUpdates, downloadUpdate, getAiConfig, setAiConfig, deleteAiConfig, testAiConnection } from '../api';
 import RuleBuilder from './RuleBuilder';
 import type { UpdateInfo, AiProvider, Persona } from '../../shared/types';
 
-const PERSONA_OPTIONS: { value: Persona; label: string; icon: React.ReactNode }[] = [
-  { value: 'management', label: 'Management / VIP', icon: <Briefcase size={14} /> },
-  { value: 'engineering_manager', label: 'Engineering Manager', icon: <Users size={14} /> },
-  { value: 'individual', label: 'Individual Contributor', icon: <User size={14} /> },
-  { value: 'delivery_manager', label: 'Delivery Manager', icon: <ClipboardList size={14} /> },
-];
+const PERSONA_LABELS: Record<Persona, { label: string; icon: React.ReactNode }> = {
+  engineering_manager: { label: 'Engineering Manager / VP', icon: <Users size={14} /> },
+  individual: { label: 'Individual Contributor', icon: <User size={14} /> },
+  delivery_manager: { label: 'Delivery Manager', icon: <ClipboardList size={14} /> },
+  management: { label: 'Member of Management', icon: <Building2 size={14} /> },
+};
 
 interface ConfigPanelProps {
   onConfigSaved?: () => void;
@@ -272,32 +272,24 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
           <div className="max-w-4xl mx-auto">
             {activeTab === 'general' && (
               <div className="space-y-8 animate-slide-up">
-                {/* Persona selector */}
+                {/* Persona (read-only) */}
                 <div className="space-y-4">
                   <FeatureHeader
-                    icon={<User size={16} className="text-white" />}
+                    icon={<Lock size={16} className="text-white" />}
                     title="Your Role"
-                    description="Controls which tabs, metrics, and AI suggestions are shown by default."
+                    description="Set during onboarding. Reset the app to change."
                     color="bg-violet-500"
                   />
                   <section className="bg-violet-500/10 p-4 rounded-lg border border-violet-500/20">
-                    <div className="flex flex-wrap gap-2">
-                      {PERSONA_OPTIONS.map(opt => (
-                        <button
-                          key={opt.value}
-                          onClick={() => setConfig({ ...config, persona: opt.value })}
-                          className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-all ${
-                            config?.persona === opt.value
-                              ? 'bg-violet-500/20 border-violet-500/40 text-violet-300 shadow-sm shadow-violet-500/15'
-                              : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                          }`}
-                        >
-                          {opt.icon}
-                          {opt.label}
-                          {config?.persona === opt.value && <Check size={14} className="text-violet-400" />}
-                        </button>
-                      ))}
-                    </div>
+                    {config?.persona && PERSONA_LABELS[config.persona] ? (
+                      <div className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-violet-500/20 border border-violet-500/40 text-violet-300">
+                        {PERSONA_LABELS[config.persona].icon}
+                        {PERSONA_LABELS[config.persona].label}
+                        <Lock size={12} className="text-violet-400/60 ml-1" />
+                      </div>
+                    ) : (
+                      <span className="text-sm text-slate-500">No role set</span>
+                    )}
                   </section>
                 </div>
 
@@ -355,6 +347,66 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ onConfigSaved }) => {
                     </div>
                   </section>
                 </div>
+
+                {/* Multi-Project Management — engineering_manager persona */}
+                {config?.persona === 'engineering_manager' && (
+                  <div className="space-y-4">
+                    <FeatureHeader
+                      icon={<FolderOpen size={16} className="text-white" />}
+                      title="Additional Projects"
+                      description="Manage additional JIRA projects for cross-project aggregation."
+                      color="bg-cyan-500"
+                    />
+                    <section className="bg-cyan-500/10 p-4 rounded-lg border border-cyan-500/20 space-y-3">
+                      {(config.projects || []).map((p: { project_key: string }, i: number) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            className="bg-slate-700/60 border border-slate-600/60 text-slate-100 text-sm rounded-md flex-1 p-2 font-mono focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-400/50"
+                            value={p.project_key}
+                            onChange={(e) => {
+                              const updated = [...(config.projects || [])];
+                              updated[i] = { ...updated[i], project_key: e.target.value.toUpperCase(), project_name: e.target.value.toUpperCase() };
+                              setConfig({ ...config, projects: updated });
+                            }}
+                            placeholder="e.g. TEAM"
+                          />
+                          <button
+                            onClick={() => {
+                              const updated = (config.projects || []).filter((_: unknown, j: number) => j !== i);
+                              setConfig({ ...config, projects: updated });
+                            }}
+                            className="p-2 text-slate-500 hover:text-rose-400 transition-colors"
+                            title="Remove project"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => {
+                          const projects = config.projects || [];
+                          setConfig({
+                            ...config,
+                            projects: [...projects, {
+                              project_key: '',
+                              project_name: '',
+                              field_ids: { tpd_bu: '', eng_hours: '', work_stream: '', story_points: '' },
+                              mapping_rules: { tpd_bu: {}, work_stream: {} },
+                              eng_start_status: config.eng_start_status || 'In Progress',
+                              eng_end_status: config.eng_end_status || 'In Review',
+                            }],
+                          });
+                        }}
+                        className="inline-flex items-center gap-2 text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
+                      >
+                        <Plus size={16} />
+                        Add Project
+                      </button>
+                      <p className="text-xs text-slate-500">Additional projects inherit the primary project's settings by default. Save to sync all projects.</p>
+                    </section>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   <FeatureHeader
