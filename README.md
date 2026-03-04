@@ -320,7 +320,7 @@ test/
 | ⚡ Functions | 85% |
 | 📏 Lines | 90% |
 
-**E2E Tests**: ~53 end-to-end tests using Playwright + Electron 🎭. Tests launch the real packaged app with an isolated user-data directory and a local JIRA mock server.
+**E2E Tests**: ~62 end-to-end tests using Playwright + Electron 🎭. Tests launch the real packaged app with an isolated user-data directory and a local JIRA mock server.
 
 ---
 

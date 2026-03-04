@@ -11,6 +11,8 @@ import {
   MOCK_FIELDS,
   MOCK_MEMBERS,
   MOCK_ISSUES,
+  MOCK_FIELD_CONTEXTS,
+  MOCK_FIELD_OPTIONS,
   makeSearchResponse,
   findIssue,
 } from './mock-data';
@@ -78,6 +80,30 @@ export class JiraMockServer {
       status: 200,
       body: MOCK_PROJECT,
     }));
+
+    // GET /rest/api/3/field/:fieldId/context (field options — must come before generic /field route)
+    this.setRoute('/rest/api/3/field/customfield_', (_req, url) => {
+      const parts = url.pathname.split('/');
+      // .../field/{fieldId}/context or .../field/{fieldId}/context/{ctxId}/option
+      const fieldIdx = parts.indexOf('field');
+      const fieldId = fieldIdx >= 0 ? parts[fieldIdx + 1] : '';
+
+      if (parts.includes('option')) {
+        // .../field/{fieldId}/context/{ctxId}/option
+        const ctxIdx = parts.indexOf('context');
+        const ctxId = ctxIdx >= 0 ? parts[ctxIdx + 1] : '';
+        const options = MOCK_FIELD_OPTIONS[ctxId] ?? { values: [], isLast: true };
+        return { status: 200, body: options };
+      }
+
+      if (parts.includes('context')) {
+        // .../field/{fieldId}/context
+        const contexts = MOCK_FIELD_CONTEXTS[fieldId] ?? { values: [] };
+        return { status: 200, body: contexts };
+      }
+
+      return null;  // fall through to /rest/api/3/field handler
+    });
 
     // GET /rest/api/3/field
     this.setRoute('/rest/api/3/field', () => ({

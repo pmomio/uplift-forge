@@ -50,4 +50,67 @@ test.describe('Engineering Attribution', () => {
     await expect(window.locator('main >> text=Avg Hours')).toBeVisible({ timeout: 10_000 });
     await expect(window.locator('main >> text=Fields Complete')).toBeVisible();
   });
+
+  test('TPD BU column uses select dropdowns, not text inputs', async ({ window }) => {
+    // Wait for ticket rows to render
+    await expect(window.locator('text=PROJ-1')).toBeVisible({ timeout: 15_000 });
+
+    // Find all select elements in the table — TPD BU and Work Stream columns
+    const selects = window.locator('main table select');
+    const count = await selects.count();
+
+    // Each visible ticket row has 2 selects (TPD BU + Work Stream), and we have 5 tickets
+    // but pagination may limit visible rows — at minimum we should have some selects
+    expect(count).toBeGreaterThanOrEqual(2);
+  });
+
+  test('TPD BU dropdown shows options from ticket data', async ({ window }) => {
+    await expect(window.locator('text=PROJ-1')).toBeVisible({ timeout: 15_000 });
+
+    // The first select in each row is TPD BU. Get the first one.
+    const firstRow = window.locator('main table tbody tr').first();
+    const tpdBuSelect = firstRow.locator('select').first();
+    await expect(tpdBuSelect).toBeVisible();
+
+    // Check that it contains the "Not set" default + ticket-derived options
+    const options = tpdBuSelect.locator('option');
+    const optionTexts = await options.allTextContents();
+    expect(optionTexts).toContain('Not set');
+    expect(optionTexts).toContain('B2B');
+    expect(optionTexts).toContain('B2C');
+  });
+
+  test('Work Stream dropdown shows options from ticket data', async ({ window }) => {
+    await expect(window.locator('text=PROJ-1')).toBeVisible({ timeout: 15_000 });
+
+    // The second select in each row is Work Stream. Get the first row's second select.
+    const firstRow = window.locator('main table tbody tr').first();
+    const workStreamSelect = firstRow.locator('select').nth(1);
+    await expect(workStreamSelect).toBeVisible();
+
+    const options = workStreamSelect.locator('option');
+    const optionTexts = await options.allTextContents();
+    expect(optionTexts).toContain('Not set');
+    expect(optionTexts).toContain('Operational');
+    expect(optionTexts).toContain('Product');
+    expect(optionTexts).toContain('Tech Debt');
+  });
+
+  test('status badges use config-driven colors', async ({ window }) => {
+    await expect(window.locator('text=PROJ-1')).toBeVisible({ timeout: 15_000 });
+
+    // PROJ-1 has status "Done" → should have emerald (green) badge
+    const doneRow = window.locator('main table tbody tr', { has: window.locator('text=PROJ-1') });
+    const doneBadge = doneRow.locator('span.rounded-full');
+    await expect(doneBadge).toBeVisible();
+    const doneClasses = await doneBadge.getAttribute('class');
+    expect(doneClasses).toContain('emerald');
+
+    // PROJ-3 has status "In Progress" → should have sky (blue) badge
+    const activeRow = window.locator('main table tbody tr', { has: window.locator('text=PROJ-3') });
+    const activeBadge = activeRow.locator('span.rounded-full');
+    await expect(activeBadge).toBeVisible();
+    const activeClasses = await activeBadge.getAttribute('class');
+    expect(activeClasses).toContain('sky');
+  });
 });

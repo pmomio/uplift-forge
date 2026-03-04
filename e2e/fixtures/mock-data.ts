@@ -182,6 +182,34 @@ export const MOCK_ISSUES = [
   },
 ];
 
+// --- Field Contexts & Options (for TPD BU and Work Stream dropdowns) ---
+export const MOCK_FIELD_CONTEXTS: Record<string, { values: Array<{ id: string }> }> = {
+  'customfield_10001': { values: [{ id: '10001' }] },  // TPD BU
+  'customfield_10003': { values: [{ id: '10003' }] },  // Work Stream
+};
+
+export const MOCK_FIELD_OPTIONS: Record<string, {
+  values: Array<{ id: string; value: string; disabled: boolean }>;
+  isLast: boolean;
+}> = {
+  '10001': {  // TPD BU context
+    values: [
+      { id: '1', value: 'B2B', disabled: false },
+      { id: '2', value: 'B2C', disabled: false },
+      { id: '3', value: 'Global Expansion', disabled: false },
+    ],
+    isLast: true,
+  },
+  '10003': {  // Work Stream context
+    values: [
+      { id: '10', value: 'Operational', disabled: false },
+      { id: '11', value: 'Product', disabled: false },
+      { id: '12', value: 'Tech Debt', disabled: false },
+    ],
+    isLast: true,
+  },
+};
+
 /** JQL search response envelope */
 export function makeSearchResponse(issues = MOCK_ISSUES) {
   return {

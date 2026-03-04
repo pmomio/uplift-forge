@@ -422,7 +422,7 @@ Both credential stores follow the same isolation pattern:
 - 💾 Each test gets an **isolated `--user-data-dir`** temp directory (auto-cleaned)
 - 🔗 JIRA API calls hit a **local HTTP mock server** — zero app code changes needed
 - 📡 Tests exercise the **full IPC chain**: renderer → preload → ipcMain → services → back
-- 🧪 ~53 tests across 9 spec files covering: login, onboarding, navigation, settings, attribution, team metrics, individual metrics, epic tracker, logout/reset
+- 🧪 ~62 tests across 9 spec files covering: login, onboarding, navigation, settings, attribution (dropdown options, status badges), team metrics, individual metrics, epic tracker (timeline metrics, risk badges), logout/reset
 - 🏗️ Global setup auto-packages the app if stale (`npx electron-forge package`)
 
 ### 📋 Test Files
