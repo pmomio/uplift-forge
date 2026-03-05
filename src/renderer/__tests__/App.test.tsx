@@ -9,9 +9,7 @@ vi.mock('react-hot-toast', () => ({
 vi.mock('../api', () => ({
   getAuthState: vi.fn(),
   getJiraProject: vi.fn(),
-  getConfig: vi.fn(),
   resetApp: vi.fn(),
-  listProjects: vi.fn().mockResolvedValue({ data: [] }),
 }));
 
 vi.mock('../components/Sidebar', () => ({
@@ -34,6 +32,13 @@ vi.mock('../pages/EngineeringAttribution', () => ({
   default: () => <div data-testid="attribution-page">Attribution</div>,
 }));
 
+vi.mock('../pages/TeamMetrics', () => ({
+  default: () => <div data-testid="team-metrics-page">Team Metrics</div>,
+}));
+
+vi.mock('../pages/IndividualMetrics', () => ({
+  default: () => <div data-testid="individual-metrics-page">Individual</div>,
+}));
 
 vi.mock('../components/ConfigPanel', () => ({
   default: ({ onConfigSaved }: any) => (
@@ -47,38 +52,6 @@ vi.mock('../components/UpdateBanner', () => ({
   default: () => <div data-testid="update-banner" />,
 }));
 
-vi.mock('../components/OnboardingWizard', () => ({
-  default: ({ onComplete }: any) => (
-    <div data-testid="onboarding-wizard">
-      <button onClick={onComplete}>Complete Onboarding</button>
-    </div>
-  ),
-}));
-
-vi.mock('../pages/EpicTracker', () => ({
-  default: () => <div data-testid="epic-tracker-page">Epic Tracker</div>,
-}));
-
-vi.mock('../pages/EmTeamDashboard', () => ({
-  default: () => <div data-testid="em-team-dashboard">EM Team Dashboard</div>,
-}));
-
-vi.mock('../pages/EmIndividualDashboard', () => ({
-  default: () => <div data-testid="em-individual-dashboard">EM Individual Dashboard</div>,
-}));
-
-vi.mock('../pages/DmFlowDashboard', () => ({
-  default: () => <div data-testid="dm-flow-dashboard">DM Flow Dashboard</div>,
-}));
-
-vi.mock('../pages/IcPersonalDashboard', () => ({
-  default: () => <div data-testid="ic-personal-dashboard">IC Personal Dashboard</div>,
-}));
-
-vi.mock('../pages/CtoOrgDashboard', () => ({
-  default: () => <div data-testid="cto-org-dashboard">CTO Org Dashboard</div>,
-}));
-
 vi.mock('../pages/LoginPage', () => ({
   default: ({ onLoginSuccess }: any) => (
     <div data-testid="login-page">
@@ -88,7 +61,7 @@ vi.mock('../pages/LoginPage', () => ({
 }));
 
 import App from '../App';
-import { getAuthState, getJiraProject, getConfig, resetApp } from '../api';
+import { getAuthState, getJiraProject, resetApp } from '../api';
 
 describe('App', () => {
   beforeEach(() => {
@@ -97,10 +70,6 @@ describe('App', () => {
       logout: vi.fn().mockResolvedValue(undefined),
       onAuthStateChanged: vi.fn(() => vi.fn()), // returns unsubscribe
     };
-    // Default: return a persona so tests get past the onboarding gate
-    (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { persona: 'engineering_manager' },
-    });
   });
 
   it('shows loading spinner initially', () => {
@@ -135,7 +104,7 @@ describe('App', () => {
     });
   });
 
-  it('navigates to team metrics tab (EM sees EmTeamDashboard)', async () => {
+  it('navigates to team metrics tab', async () => {
     (getAuthState as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { status: 'authenticated', email: 'test@test.com' },
     });
@@ -146,7 +115,7 @@ describe('App', () => {
     await waitFor(() => screen.getByTestId('sidebar'));
     fireEvent.click(screen.getByText('Switch to Metrics'));
     await waitFor(() => {
-      expect(screen.getByTestId('em-team-dashboard')).toBeInTheDocument();
+      expect(screen.getByTestId('team-metrics-page')).toBeInTheDocument();
     });
   });
 
@@ -196,7 +165,7 @@ describe('App', () => {
     });
   });
 
-  it('handles reset — goes to login (full wipe)', async () => {
+  it('handles reset', async () => {
     (getAuthState as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { status: 'authenticated', email: 'test@test.com' },
     });
@@ -209,7 +178,6 @@ describe('App', () => {
     fireEvent.click(screen.getByText('Reset'));
     await waitFor(() => {
       expect(resetApp).toHaveBeenCalled();
-      // Full reset — clears auth, goes back to login page
       expect(screen.getByTestId('login-page')).toBeInTheDocument();
     });
   });
@@ -288,24 +256,6 @@ describe('App', () => {
     render(<App />);
     await waitFor(() => {
       expect(screen.getByTestId('sidebar')).toBeInTheDocument();
-    });
-  });
-
-  it('routes management persona to CtoOrgDashboard on metrics tab', async () => {
-    (getAuthState as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { status: 'authenticated', email: 'test@test.com' },
-    });
-    (getJiraProject as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { key: 'PROJ', name: 'Test', lead: null, avatar: null },
-    });
-    (getConfig as ReturnType<typeof vi.fn>).mockResolvedValue({
-      data: { persona: 'management' },
-    });
-    render(<App />);
-    await waitFor(() => screen.getByTestId('sidebar'));
-    fireEvent.click(screen.getByText('Switch to Metrics'));
-    await waitFor(() => {
-      expect(screen.getByTestId('cto-org-dashboard')).toBeInTheDocument();
     });
   });
 });

@@ -50,16 +50,10 @@ vi.mock('../../src/main/services/jira.service.js', () => ({
   updateIssueFields: vi.fn(),
 }));
 
-// Mock timeline service (imported by ticket.service for cache invalidation)
-vi.mock('../../src/main/services/timeline.service.js', () => ({
-  invalidateTimelineCache: vi.fn(),
-}));
-
 import {
   processIssue,
   reprocessCache,
   syncTickets,
-  syncAllProjects,
   syncSingleTicket,
   calculateTicketHours,
   calculateTicketFields,
@@ -390,56 +384,6 @@ describe('ticket.service', () => {
       const members = getJiraMembers();
       const hasNull = members.some(m => !m.accountId);
       expect(hasNull).toBe(false);
-    });
-  });
-
-  describe('per-project caches', () => {
-    it('getTickets without projectKey aggregates all projects', () => {
-      // Process issues under different project keys (inferred from ticket key prefix)
-      processIssue(makeIssue('TEST-1', { status: { name: 'Done' } }));
-      processIssue(makeIssue('OTHER-1', { status: { name: 'Done' } }));
-      const allTickets = getTickets();
-      const keys = allTickets.map(t => t.key);
-      expect(keys).toContain('TEST-1');
-      expect(keys).toContain('OTHER-1');
-    });
-
-    it('getTickets with projectKey returns only that project', () => {
-      // Must pass explicit projectKey since processIssue defaults to config's project_key
-      processIssue(makeIssue('AAA-1', { status: { name: 'Done' } }), true, 'AAA');
-      processIssue(makeIssue('BBB-1', { status: { name: 'Done' } }), true, 'BBB');
-      const aTickets = getTickets('AAA');
-      const aKeys = aTickets.map(t => t.key);
-      expect(aKeys).toContain('AAA-1');
-      expect(aKeys).not.toContain('BBB-1');
-    });
-
-    it('processIssue sets project_key on ticket', () => {
-      processIssue(makeIssue('PROJ-5', { status: { name: 'Done' } }));
-      const tickets = getTickets();
-      const t = tickets.find(t => t.key === 'PROJ-5');
-      expect(t).toBeDefined();
-      expect(t!.project_key).toBeDefined();
-    });
-  });
-
-  describe('syncAllProjects', () => {
-    it('syncs primary project and returns results', async () => {
-      mockGetIssues.mockResolvedValue([makeIssue('TEST-S1')]);
-      const result = await syncAllProjects();
-      expect(result).toBeDefined();
-      expect(typeof result).toBe('object');
-      expect(mockGetIssues).toHaveBeenCalled();
-    });
-
-    it('returns empty object-like result when getIssues fails', async () => {
-      mockGetIssues.mockRejectedValue(new Error('Network error'));
-      const result = await syncAllProjects();
-      expect(result).toBeDefined();
-      // Even with failure, syncAllProjects catches per-project and returns 0
-      for (const count of Object.values(result)) {
-        expect(count).toBe(0);
-      }
     });
   });
 });
