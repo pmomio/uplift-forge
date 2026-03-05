@@ -17,6 +17,7 @@ export const Channels = {
   JIRA_FIELDS: 'jira:fields',
   JIRA_STATUSES: 'jira:statuses',
   JIRA_MEMBERS: 'jira:members',
+  JIRA_FIELD_OPTIONS: 'jira:field-options',
 
   // Tickets
   TICKETS_LIST: 'tickets:list',

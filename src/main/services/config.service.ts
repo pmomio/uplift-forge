@@ -1,5 +1,5 @@
 import Store from 'electron-store';
-import type { AppConfig, FieldIds, MappingRules, TicketFilter, TrackedEngineer } from '../../shared/types.js';
+import type { AppConfig, FieldIds, MappingRules, TicketFilter, TrackedEngineer, Persona, MetricPreferences, ProjectConfig, AgingThresholds } from '../../shared/types.js';
 
 const defaults: AppConfig = {
   project_key: '',
@@ -25,6 +25,14 @@ const defaults: AppConfig = {
   ticket_filter: { mode: 'last_x_months', months: 6 },
   sp_to_days: 1,
   tracked_engineers: [],
+  active_statuses: ['In Progress', 'Code Review', 'QA'],
+  blocked_statuses: ['Blocked'],
+  done_statuses: ['Done', 'Resolved', 'Closed', 'Rejected', 'Cancelled'],
+  bug_type_names: ['bug', 'defect'],
+  product_type_names: ['story', 'task', 'feature', 'enhancement', 'improvement'],
+  tech_debt_label_names: ['tech-debt', 'technical-debt', 'debt', 'maintenance'],
+  review_status_keywords: ['review'],
+  product_work_stream_names: ['product'],
 };
 
 const store = new Store<AppConfig>({
@@ -44,6 +52,23 @@ export function getConfig(): AppConfig {
     ticket_filter: store.get('ticket_filter'),
     sp_to_days: store.get('sp_to_days'),
     tracked_engineers: store.get('tracked_engineers'),
+    persona: store.get('persona') as Persona | undefined,
+    metric_preferences: store.get('metric_preferences') as MetricPreferences | undefined,
+    projects: store.get('projects') as ProjectConfig[] | undefined,
+    active_statuses: store.get('active_statuses') ?? defaults.active_statuses,
+    blocked_statuses: store.get('blocked_statuses') ?? defaults.blocked_statuses,
+    done_statuses: store.get('done_statuses') ?? defaults.done_statuses,
+    wip_limit: store.get('wip_limit') as number | undefined,
+    aging_thresholds: store.get('aging_thresholds') as AgingThresholds | undefined,
+    my_account_id: store.get('my_account_id') as string | undefined,
+    personal_goals: store.get('personal_goals') as Record<string, number> | undefined,
+    opt_in_team_comparison: store.get('opt_in_team_comparison') as boolean | undefined,
+    seniority_field_id: store.get('seniority_field_id') as string | undefined,
+    bug_type_names: store.get('bug_type_names') ?? defaults.bug_type_names,
+    product_type_names: store.get('product_type_names') ?? defaults.product_type_names,
+    tech_debt_label_names: store.get('tech_debt_label_names') ?? defaults.tech_debt_label_names,
+    review_status_keywords: store.get('review_status_keywords') ?? defaults.review_status_keywords,
+    product_work_stream_names: store.get('product_work_stream_names') ?? defaults.product_work_stream_names,
   };
 }
 
@@ -57,6 +82,23 @@ export interface ConfigUpdate {
   mapping_rules?: MappingRules;
   sp_to_days?: number;
   tracked_engineers?: TrackedEngineer[];
+  persona?: Persona;
+  metric_preferences?: MetricPreferences;
+  projects?: ProjectConfig[];
+  active_statuses?: string[];
+  blocked_statuses?: string[];
+  done_statuses?: string[];
+  wip_limit?: number;
+  aging_thresholds?: AgingThresholds;
+  my_account_id?: string;
+  personal_goals?: Record<string, number>;
+  opt_in_team_comparison?: boolean;
+  seniority_field_id?: string;
+  bug_type_names?: string[];
+  product_type_names?: string[];
+  tech_debt_label_names?: string[];
+  review_status_keywords?: string[];
+  product_work_stream_names?: string[];
 }
 
 export function updateConfig(patch: ConfigUpdate): { projectKeyChanged: boolean; filterChanged: boolean; rulesChanged: boolean } {
@@ -75,8 +117,33 @@ export function updateConfig(patch: ConfigUpdate): { projectKeyChanged: boolean;
   if (patch.mapping_rules != null) store.set('mapping_rules', patch.mapping_rules);
   if (patch.sp_to_days != null) store.set('sp_to_days', Number(patch.sp_to_days));
   if (patch.tracked_engineers != null) store.set('tracked_engineers', patch.tracked_engineers);
+  if (patch.persona != null) store.set('persona', patch.persona);
+  if (patch.metric_preferences != null) store.set('metric_preferences', patch.metric_preferences);
+  if (patch.projects != null) store.set('projects', patch.projects);
+  if (patch.active_statuses != null) store.set('active_statuses', patch.active_statuses);
+  if (patch.blocked_statuses != null) store.set('blocked_statuses', patch.blocked_statuses);
+  if (patch.done_statuses != null) store.set('done_statuses', patch.done_statuses);
+  if (patch.wip_limit != null) store.set('wip_limit', patch.wip_limit);
+  if (patch.aging_thresholds != null) store.set('aging_thresholds', patch.aging_thresholds);
+  if (patch.my_account_id != null) store.set('my_account_id', patch.my_account_id);
+  if (patch.personal_goals != null) store.set('personal_goals', patch.personal_goals);
+  if (patch.opt_in_team_comparison != null) store.set('opt_in_team_comparison', patch.opt_in_team_comparison);
+  if (patch.seniority_field_id != null) store.set('seniority_field_id', patch.seniority_field_id);
+  if (patch.bug_type_names != null) store.set('bug_type_names', patch.bug_type_names);
+  if (patch.product_type_names != null) store.set('product_type_names', patch.product_type_names);
+  if (patch.tech_debt_label_names != null) store.set('tech_debt_label_names', patch.tech_debt_label_names);
+  if (patch.review_status_keywords != null) store.set('review_status_keywords', patch.review_status_keywords);
+  if (patch.product_work_stream_names != null) store.set('product_work_stream_names', patch.product_work_stream_names);
 
   return { projectKeyChanged, filterChanged, rulesChanged };
+}
+
+/**
+ * Reset all config to defaults (preserves nothing).
+ * Used by "Reset App" to return to onboarding.
+ */
+export function resetConfig(): void {
+  store.clear();
 }
 
 /** Expose store instance for ticket cache persistence. */

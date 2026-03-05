@@ -1,5 +1,5 @@
 import { getAuthHeader, getBaseUrl } from '../auth/token-store.js';
-import type { JiraField, JiraStatus, JiraMember, ProjectInfo } from '../../shared/types.js';
+import type { JiraField, JiraFieldOption, JiraStatus, JiraMember, ProjectInfo } from '../../shared/types.js';
 
 /**
  * JIRA REST API v3 with Basic auth (email + API token).
@@ -51,7 +51,7 @@ export async function getIssues(projectKey: string, months?: number): Promise<un
     const maxDay = new Date(y, m, 0).getDate(); // day 0 of next month = last day of m
     const d = Math.min(now.getDate(), maxDay);
     const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    jql += ` AND resolved >= "${dateStr}"`;
+    jql += ` AND (resolved >= "${dateStr}" OR resolution = EMPTY)`;
   }
 
   jql += ' ORDER BY updated DESC';
@@ -158,6 +158,63 @@ export async function getAllStatuses(): Promise<JiraStatus[]> {
   }
   result.sort((a, b) => a.name.localeCompare(b.name));
   return result;
+}
+
+/**
+ * Fetch allowed values (options) for a custom select/multi-select field.
+ * Uses the JIRA REST API v3 custom field context + options endpoints.
+ * Returns a deduplicated array of { id, value } objects.
+ */
+export async function getFieldOptions(fieldId: string): Promise<JiraFieldOption[]> {
+  try {
+    // Step 1: Get contexts for the field
+    const ctxResponse = await jiraFetch(`/field/${fieldId}/context`);
+    const ctxResult = await ctxResponse.json() as {
+      values?: Array<{ id: string }>;
+    };
+
+    const contexts = ctxResult.values ?? [];
+    if (contexts.length === 0) return [];
+
+    // Step 2: For each context, fetch options (with pagination)
+    const seen = new Set<string>();
+    const options: JiraFieldOption[] = [];
+
+    for (const ctx of contexts) {
+      let startAt = 0;
+      const maxResults = 1000;
+
+      while (true) {
+        const params = new URLSearchParams({
+          startAt: String(startAt),
+          maxResults: String(maxResults),
+        });
+        const optResponse = await jiraFetch(`/field/${fieldId}/context/${ctx.id}/option?${params.toString()}`);
+        const optResult = await optResponse.json() as {
+          values?: Array<{ id: string; value: string; disabled?: boolean }>;
+          isLast?: boolean;
+          total?: number;
+        };
+
+        const values = optResult.values ?? [];
+        for (const opt of values) {
+          if (!opt.disabled && opt.value && !seen.has(opt.value)) {
+            seen.add(opt.value);
+            options.push({ id: opt.id, value: opt.value });
+          }
+        }
+
+        if (values.length === 0 || optResult.isLast !== false) break;
+        startAt += values.length;
+      }
+    }
+
+    options.sort((a, b) => a.value.localeCompare(b.value));
+    return options;
+  } catch (e) {
+    console.warn(`[JIRA] Failed to fetch field options for ${fieldId}:`, e);
+    return [];
+  }
 }
 
 /**

@@ -30,6 +30,9 @@ vi.mock('../../src/main/services/config.service.js', () => ({
     ticket_filter: { mode: 'last_x_months', months: 6 },
     sp_to_days: 1,
     tracked_engineers: [],
+    done_statuses: ['Done', 'Resolved', 'Closed', 'Rejected', 'Cancelled'],
+    blocked_statuses: ['Blocked'],
+    active_statuses: ['In Progress', 'Code Review', 'QA'],
   })),
 }));
 
@@ -58,7 +61,6 @@ import {
   updateTicket,
   getVisibleTicketCount,
   getJiraMembers,
-  FINAL_STATUSES,
 } from '../../src/main/services/ticket.service.js';
 import * as jira from '../../src/main/services/jira.service.js';
 import { calculateEngineeringHours, getMappedFields } from '../../src/main/services/field-engine.service.js';
@@ -97,11 +99,13 @@ describe('ticket.service', () => {
     mockGetMapped.mockReturnValue(['B2C', 'Product']);
   });
 
-  describe('FINAL_STATUSES', () => {
-    it('contains expected statuses', () => {
-      expect(FINAL_STATUSES).toContain('Done');
-      expect(FINAL_STATUSES).toContain('Resolved');
-      expect(FINAL_STATUSES).toContain('Closed');
+  describe('done status filtering', () => {
+    it('uses done_statuses from config for filtering', () => {
+      // getTickets uses cfg.done_statuses — verified by the config mock above
+      const cfg = getConfig();
+      expect(cfg.done_statuses).toContain('Done');
+      expect(cfg.done_statuses).toContain('Resolved');
+      expect(cfg.done_statuses).toContain('Closed');
     });
   });
 

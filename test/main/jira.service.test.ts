@@ -15,6 +15,7 @@ import {
   getAllFields,
   getAllStatuses,
   getProject,
+  getFieldOptions,
 } from '../../src/main/services/jira.service.js';
 import { getAuthHeader, getBaseUrl } from '../../src/main/auth/token-store.js';
 
@@ -83,6 +84,7 @@ describe('jira.service', () => {
       await getIssues('PROJ', 3);
       const callUrl = (fetch as any).mock.calls[0][0] as string;
       expect(callUrl).toContain('resolved');
+      expect(callUrl).toContain('resolution');
     });
 
     it('handles empty result', async () => {
@@ -219,6 +221,99 @@ describe('jira.service', () => {
       expect(result.key).toBe('PROJ');
       expect(result.name).toBe('PROJ');
       expect((result as any).error).toBeDefined();
+    });
+  });
+
+  describe('getFieldOptions', () => {
+    it('fetches and returns sorted, deduplicated options', async () => {
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ values: [{ id: '10100' }] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            values: [
+              { id: '1', value: 'Product' },
+              { id: '2', value: 'Operational' },
+              { id: '3', value: 'Product' }, // duplicate
+            ],
+            isLast: true,
+          }),
+        });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await getFieldOptions('customfield_10100');
+      expect(result).toEqual([
+        { id: '2', value: 'Operational' },
+        { id: '1', value: 'Product' },
+      ]);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('handles pagination across option pages', async () => {
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ values: [{ id: '10100' }] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            values: [{ id: '1', value: 'Alpha' }],
+            isLast: false,
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            values: [{ id: '2', value: 'Beta' }],
+            isLast: true,
+          }),
+        });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await getFieldOptions('customfield_10100');
+      expect(result).toEqual([
+        { id: '1', value: 'Alpha' },
+        { id: '2', value: 'Beta' },
+      ]);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('excludes disabled options', async () => {
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ values: [{ id: '10100' }] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            values: [
+              { id: '1', value: 'Active', disabled: false },
+              { id: '2', value: 'Deprecated', disabled: true },
+            ],
+            isLast: true,
+          }),
+        });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await getFieldOptions('customfield_10100');
+      expect(result).toEqual([{ id: '1', value: 'Active' }]);
+    });
+
+    it('returns empty array when field has no contexts', async () => {
+      mockFetch({ values: [] });
+      const result = await getFieldOptions('customfield_99999');
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty array on API error', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network fail')));
+      const result = await getFieldOptions('customfield_10100');
+      expect(result).toEqual([]);
     });
   });
 });

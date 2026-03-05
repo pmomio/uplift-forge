@@ -26,6 +26,7 @@ const api = {
   getJiraFields: () => ipcRenderer.invoke(Channels.JIRA_FIELDS),
   getJiraStatuses: () => ipcRenderer.invoke(Channels.JIRA_STATUSES),
   getJiraMembers: () => ipcRenderer.invoke(Channels.JIRA_MEMBERS),
+  getJiraFieldOptions: (fieldId: string) => ipcRenderer.invoke(Channels.JIRA_FIELD_OPTIONS, fieldId),
 
   // Tickets
   getTickets: () => ipcRenderer.invoke(Channels.TICKETS_LIST),

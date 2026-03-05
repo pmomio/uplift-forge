@@ -12,6 +12,13 @@ vi.mock('../../api', () => ({
   syncSingleTicket: vi.fn(),
   calculateHours: vi.fn(),
   calculateFields: vi.fn(),
+  getConfig: vi.fn().mockResolvedValue({ data: {
+    done_statuses: ['Done', 'Resolved', 'Closed', 'Rejected', 'Cancelled'],
+    blocked_statuses: ['Blocked'],
+    mapping_rules: { tpd_bu: {}, work_stream: {} },
+    field_ids: { tpd_bu: 'customfield_10100', work_stream: 'customfield_10200', eng_hours: 'customfield_10300' },
+  }}),
+  getJiraFieldOptions: vi.fn().mockResolvedValue({ data: [] }),
 }));
 
 import EngineeringAttribution from '../EngineeringAttribution';

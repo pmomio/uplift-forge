@@ -25,6 +25,7 @@ export const getJiraProject = () => wrap(window.api.getJiraProject());
 export const getJiraFields = () => wrap(window.api.getJiraFields());
 export const getJiraStatuses = () => wrap(window.api.getJiraStatuses());
 export const getJiraMembers = () => wrap(window.api.getJiraMembers());
+export const getJiraFieldOptions = (fieldId: string) => wrap(window.api.getJiraFieldOptions(fieldId));
 
 // Tickets
 export const getTickets = () => wrap(window.api.getTickets());

@@ -88,6 +88,10 @@ export function registerIpcHandlers(): void {
     return ticketService.getJiraMembers();
   });
 
+  ipcMain.handle(Channels.JIRA_FIELD_OPTIONS, async (_event, fieldId: string) => {
+    return jiraService.getFieldOptions(fieldId);
+  });
+
   // ----- Tickets -----
   ipcMain.handle(Channels.TICKETS_LIST, () => {
     return ticketService.getTickets();

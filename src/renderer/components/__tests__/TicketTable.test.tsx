@@ -38,6 +38,10 @@ describe('TicketTable', () => {
     onUpdate: vi.fn(),
     missingFilter: null as null | 'tpd_bu' | 'eng_hours' | 'work_stream',
     onClearFilter: vi.fn(),
+    statusConfig: { done: ['Done', 'Resolved', 'Closed', 'Rejected', 'Cancelled'], blocked: ['Blocked'] },
+    mappingRules: { tpd_bu: { B2C: 'B2C', B2B: 'B2B' }, work_stream: { Product: 'Product', Operational: 'Operational' } },
+    tpdBuOptions: ['B2B', 'B2C'],
+    workStreamOptions: ['Operational', 'Product'],
   };
 
   beforeEach(() => {
