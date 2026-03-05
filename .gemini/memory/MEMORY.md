@@ -1,11 +1,11 @@
 # Uplift Forge - Memory
 
 ## Workflow Rules
-- **Always update docs after changes**: After any code changes, update README.md, CLAUDE.md, and any spec files. This was explicitly requested by the user.
+- **Always update docs after changes**: After any code changes, update README.md, GEMINI.md, and any spec files. This was explicitly requested by the user.
 - **Always update USER_GUIDE.md**: When adding a new feature, the end-user guide (`USER_GUIDE.md`) must be updated. Explicitly requested by the user.
-- **Use playful emojis in docs**: All documentation files (README.md, CLAUDE.md, USER_GUIDE.md) should use playful emojis throughout. Explicitly requested by the user.
+- **Use playful emojis in docs**: All documentation files (README.md, GEMINI.md, USER_GUIDE.md) should use playful emojis throughout. Explicitly requested by the user.
 - **Makefile is the primary developer interface**: All commands in docs must use `make` targets, NOT raw `npm` commands. The Makefile wraps all npm scripts and is the single entry point for developers and end-users. When adding new npm scripts, always add a corresponding Makefile target. Explicitly requested by the user.
-- **Memory lives in repo**: The memory folder must reside at `.claude/memory/` inside the repository, not the external Claude projects path.
+- **Memory lives in repo**: The memory folder must reside at `.gemini/memory/` inside the repository, not the external Claude projects path.
 - **Save to memory before starting work**: Whenever starting work on a new task/feature, first save what you're working on in memory. This ensures continuity across sessions. Explicitly requested by the user.
 - **Track work status in memory**: Always keep the "Current Work" section up to date — add it when starting a task, update progress during work, and move it to "Completed" when done. This ensures continuity and avoids repeated context-gathering across sessions. Explicitly requested by the user.
 - **Add e2e tests for new features**: Whenever a new feature is added, update or add Playwright e2e tests if applicable. E2e tests live in `e2e/tests/` and use fixtures from `e2e/fixtures/`. Explicitly requested by the user.
@@ -24,7 +24,7 @@
 - EM: 1-10 teams, cross-project aggregation, team pulse + individual reports
 - DM: 1-N projects (org-wide flow view), cross-project aggregation on DM-specific metrics
 - IC: 1 project, self-only metrics, private by default
-- See `PRODUCT_SPEC.md` and `.claude/memory/data-model.md` for full details
+- See `PRODUCT_SPEC.md` and `.gemini/memory/data-model.md` for full details
 
 ## Current Work: Update E2E Tests for New Features
 - Need to update e2e tests to cover: JIRA field options in dropdowns, config-driven status colors, status helper, and any other recent features

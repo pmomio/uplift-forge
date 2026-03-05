@@ -35,5 +35,5 @@ Thumbs.db
 *.swp
 *.swo
 
-# Claude Code (keep .claude/memory/ tracked)
-.claude/settings.local.json
+# Gemini Code (keep .gemini/memory/ tracked)
+.gemini/settings.local.json
