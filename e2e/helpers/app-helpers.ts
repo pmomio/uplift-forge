@@ -53,7 +53,7 @@ export async function completeOnboardingViaUI(
   await window.waitForSelector('text=What\'s your role?', { timeout: 10_000 });
 
   const personaLabels: Record<string, string> = {
-    management: 'Management / VIP',
+    management: 'Member of Management',
     engineering_manager: 'Engineering Manager / VP',
     individual: 'Individual Contributor',
     delivery_manager: 'Delivery Manager',

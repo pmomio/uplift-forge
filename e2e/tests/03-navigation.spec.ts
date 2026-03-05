@@ -30,18 +30,18 @@ test.describe('Navigation & Sidebar', () => {
     await expect(window.locator('aside >> text=Epic Tracker')).not.toBeVisible();
   });
 
-  test('Management sees 4 tabs', async ({ window, jiraMock }) => {
+  test('Management sees 5 tabs', async ({ window, jiraMock }) => {
     await loginAndOnboard(window, jiraMock.baseUrl, 'management');
     await expect(window.locator('aside')).toBeVisible({ timeout: 15_000 });
 
     await expect(window.locator('aside >> text=Home')).toBeVisible();
     await expect(window.locator('aside >> text=Eng. Attribution')).toBeVisible();
     await expect(window.locator('aside >> text=Team Metrics')).toBeVisible();
+    await expect(window.locator('aside >> text=Epic Tracker')).toBeVisible();
     await expect(window.locator('aside >> text=Settings')).toBeVisible();
 
     // These should NOT be visible
     await expect(window.locator('aside >> text=Individual Metrics')).not.toBeVisible();
-    await expect(window.locator('aside >> text=Epic Tracker')).not.toBeVisible();
   });
 
   test('Delivery Manager sees 5 tabs', async ({ window, jiraMock }) => {

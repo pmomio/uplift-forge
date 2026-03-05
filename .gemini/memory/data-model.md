@@ -1,12 +1,13 @@
 # Data Model — Persona-Specific Metrics
 
-## Personas (3 total)
+## Personas (4 total)
 
 | Persona | Label | Projects | Tabs |
 |---------|-------|----------|------|
 | `engineering_manager` | EM / VP Engineering | 1–10 teams | home, attribution, metrics, individual, epics, config |
 | `individual` | Individual Contributor | 1 project | home, individual, config |
 | `delivery_manager` | Delivery Manager | 1–N projects (org-wide) | home, metrics, epics, attribution, config |
+| `management` | Member of Management | All Projects | home, attribution, metrics, epics, config |
 
 ## Shared Foundation Layer
 

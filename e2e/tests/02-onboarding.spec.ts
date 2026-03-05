@@ -19,7 +19,7 @@ test.describe('Onboarding Wizard', () => {
     await window.click('text=Continue');
     await window.waitForSelector('text=What\'s your role?', { timeout: 10_000 });
 
-    await expect(window.locator('text=Management / VIP')).toBeVisible();
+    await expect(window.locator('text=Member of Management')).toBeVisible();
     await expect(window.locator('text=Engineering Manager / VP')).toBeVisible();
     await expect(window.locator('text=Individual Contributor')).toBeVisible();
     await expect(window.locator('text=Delivery Manager')).toBeVisible();

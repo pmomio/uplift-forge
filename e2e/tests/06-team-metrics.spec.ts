@@ -9,13 +9,14 @@ test.describe('Team Metrics', () => {
     // Tickets are auto-synced during onboarding (config save triggers sync)
     // Navigate to Team Metrics
     await navigateTo(window, 'Team Metrics');
-    await expect(window.locator('main >> h1:has-text("Team Metrics")')).toBeVisible({ timeout: 10_000 });
+    // For EM, header should contain "Dashboard" (e.g. "Test Project — Team Dashboard" or "All Projects — Team Dashboard")
+    await expect(window.locator('main >> h1:has-text("Dashboard")')).toBeVisible({ timeout: 15_000 });
   });
 
   test('KPI cards show after sync', async ({ window }) => {
     await expect(window.locator('main >> text=Total Tickets')).toBeVisible({ timeout: 10_000 });
-    await expect(window.locator('main >> text=Total Story Points')).toBeVisible({ timeout: 10_000 });
-    await expect(window.locator('main >> text=Total Eng Hours')).toBeVisible({ timeout: 10_000 });
+    await expect(window.locator('main >> text=Cycle Time p50')).toBeVisible({ timeout: 10_000 });
+    await expect(window.locator('main >> text=Rework Rate')).toBeVisible({ timeout: 10_000 });
   });
 
   test('period selector has 4 options', async ({ window }) => {

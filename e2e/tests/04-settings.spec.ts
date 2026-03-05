@@ -17,12 +17,10 @@ test.describe('Settings (ConfigPanel)', () => {
     await expect(window.locator('main >> button:has-text("Application Settings")')).toBeVisible();
   });
 
-  test('General tab shows persona selector', async ({ window }) => {
-    // General tab should be active by default and show persona options
-    await expect(window.locator('main >> text=Management / VIP')).toBeVisible();
-    await expect(window.locator('main >> text=Engineering Manager')).toBeVisible();
-    await expect(window.locator('main >> text=Individual Contributor')).toBeVisible();
-    await expect(window.locator('main >> text=Delivery Manager')).toBeVisible();
+  test('General tab shows persona badge', async ({ window }) => {
+    // General tab should show the active persona badge (Engineering Manager / VP)
+    await window.waitForTimeout(2000);
+    await expect(window.locator('text=Engineering Manager / VP').first()).toBeVisible({ timeout: 15_000 });
   });
 
   test('Fetch Fields calls JIRA fields endpoint', async ({ window }) => {

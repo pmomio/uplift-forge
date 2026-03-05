@@ -13,14 +13,13 @@
 - Per-project ticket caches implemented in `ticket.service.ts` (project-keyed Map of Maps)
 - Management persona gets all 6 tabs with cross-project aggregation
 
-## Persona Redesign (March 2026)
-- **Merge management + engineering_manager into single `engineering_manager` persona** labeled "EM / VP Engineering"
-- **3 personas total**: `engineering_manager`, `individual`, `delivery_manager`
-- **Each persona sees fundamentally different metrics** — not just hidden/shown cards on shared pages
-- EM: 1-10 teams, cross-project aggregation, team pulse + individual reports
-- DM: 1-N projects (org-wide flow view), cross-project aggregation on DM-specific metrics
-- IC: 1 project, self-only metrics, private by default
-- See `PRODUCT_SPEC.md` and `.claude/memory/data-model.md` for full details
+## Persona System (4 personas)
+- **4 personas total**: `engineering_manager`, `individual`, `delivery_manager`, `management`
+- **engineering_manager**: EM / VP Engineering. 1-10 teams, cross-project aggregation, team pulse + individual reports.
+- **individual**: Individual Contributor. 1 project, self-only metrics, private by default.
+- **delivery_manager**: Delivery Manager. 1-N projects (org-wide flow view), cross-project aggregation on DM-specific metrics.
+- **management**: Member of Management. Organizational health radar — cross-project delivery, quality, and efficiency metrics. No individual visibility.
+- Each persona sees fundamentally different metrics tailored to their specific needs.
 
 ## Data Architecture Decisions
 - Raw JIRA data already contains everything needed (`fields: '*all'`, `expand: 'changelog'`)

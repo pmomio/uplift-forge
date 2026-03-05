@@ -432,9 +432,15 @@ const EmIndividualDashboard: React.FC<EmIndividualDashboardProps> = ({ refreshKe
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-64 text-slate-500">
-            <Users size={32} className="mb-2 opacity-50" />
-            <p className="text-sm">No data yet. Sync and configure tracked engineers to see individual metrics.</p>
+          <div className="flex flex-col items-center justify-center h-64 text-slate-500 animate-fade-in">
+            <div className="w-16 h-16 rounded-full bg-slate-800/50 flex items-center justify-center mb-4">
+              <Users size={32} className="opacity-20" />
+            </div>
+            <h3 className="text-slate-300 font-medium mb-1">No tracked engineers configured</h3>
+            <p className="text-xs max-w-xs text-center leading-relaxed">
+              Individual metrics require a list of engineers to track.
+              Configure them in <span className="text-indigo-400 font-medium">Settings</span> to see data here.
+            </p>
           </div>
         )}
       </div>
