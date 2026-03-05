@@ -354,6 +354,8 @@ The `epic.service.ts` generates human-readable `riskFactors[]` strings for each 
 
 All renderer↔main communication uses typed IPC channels defined in `shared/channels.ts`. The renderer's `api.ts` wraps IPC calls in `{ data }` to match Axios response shape. The preload script (`preload.ts`) exposes `window.api` via `contextBridge`.
 
+**🔐 Credential Verification**: The `AUTH_LOGIN` channel performs real-time verification of JIRA credentials by calling the `/myself` endpoint before saving them to the secure store. This ensures invalid API tokens are caught during the login phase.
+
 **Persona-specific metric channels** (with persona guards):
 - `METRICS_EM_TEAM` → `getEmTeamMetrics(period, projectKey?)` — EM only
 - `METRICS_EM_INDIVIDUAL` → `getEmIndividualMetrics(period, projectKey?)` — EM only
@@ -392,14 +394,14 @@ Both credential stores follow the same isolation pattern:
 - 🎭 Main service tests mock `electron-store` and `getConfig()` via `vi.mock()`
 - 🌐 Renderer tests use jsdom + Testing Library, mock `window.api` globally
 - 📊 Coverage thresholds: statements 90%, branches 80%, functions 85%, lines 90%
-- ✅ 672 tests across 33 test suites
+- ✅ 675 tests across 33 test suites
 
 ### 🎭 E2E Tests (Playwright + Electron)
 - 🔌 Launches the **real packaged app** (`out/Uplift Forge-darwin-arm64/`) per test
 - 💾 Each test gets an **isolated `--user-data-dir`** temp directory (auto-cleaned)
 - 🔗 JIRA API calls hit a **local HTTP mock server** — zero app code changes needed
 - 📡 Tests exercise the **full IPC chain**: renderer → preload → ipcMain → services → back
-- 🧪 ~53 tests across 9 spec files covering: login, onboarding, navigation, settings, attribution, team metrics, individual metrics, epic tracker, logout/reset
+- 🧪 ~54 tests across 9 spec files covering: login (incl. invalid credentials), onboarding, navigation, settings, attribution, team metrics, individual metrics, epic tracker, logout/reset
 - 🏗️ Global setup auto-packages the app if stale (`npx electron-forge package`)
 
 ### 📋 Test Files

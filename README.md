@@ -61,6 +61,8 @@ On first launch you'll see a login screen. You need three things:
 | 📧 **Email** | The email on your Atlassian account |
 | 🔑 **API Token** | Generate one at [id.atlassian.com](https://id.atlassian.com/manage-profile/security/api-tokens) |
 
+**🔐 Real-time Verification**: Uplift Forge verifies your credentials against the JIRA API before saving them. If your API token is invalid or expired, you'll receive an immediate error message. 🛡️
+
 That's it. No OAuth dance, no callback URLs, no environment variables. Your credentials are encrypted at rest using your OS keychain (macOS Keychain / Windows DPAPI). 🛡️
 
 ### 4. ⚙️ Configure your project
@@ -303,7 +305,7 @@ test/
 
 ### 🧪 Testing
 
-**Unit Tests**: 672 tests across 33 test suites (Vitest + Testing Library). Coverage thresholds enforced:
+**Unit Tests**: 675 tests across 33 test suites (Vitest + Testing Library). Coverage thresholds enforced:
 
 | Metric | Threshold |
 |--------|-----------|
@@ -312,7 +314,8 @@ test/
 | ⚡ Functions | 85% |
 | 📏 Lines | 90% |
 
-**E2E Tests**: ~53 end-to-end tests using Playwright + Electron 🎭. Tests launch the real packaged app with an isolated user-data directory and a local JIRA mock server.
+**E2E Tests**: ~54 end-to-end tests using Playwright + Electron 🎭.
+ Tests launch the real packaged app with an isolated user-data directory and a local JIRA mock server.
 
 ---
 
