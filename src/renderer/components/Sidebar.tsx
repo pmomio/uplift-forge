@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Settings, BarChart3, Home, TrendingUp, Users, LogOut, Info } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Settings, BarChart3, Home, TrendingUp, Users, LogOut, Info, ClipboardList } from 'lucide-react';
 import type { ProjectInfo } from '../App';
+import type { Persona } from '../../shared/types';
 import { checkForUpdates } from '../api';
 import logoSrc from '../../../assets/logo.png';
 
@@ -10,13 +11,25 @@ export interface Tab {
   icon: React.ReactNode;
 }
 
-export const TABS: Tab[] = [
+export const ALL_TABS: Tab[] = [
   { id: 'home', label: 'Home', icon: <Home size={18} /> },
   { id: 'attribution', label: 'Eng. Attribution', icon: <BarChart3 size={18} /> },
   { id: 'metrics', label: 'Team Metrics', icon: <TrendingUp size={18} /> },
   { id: 'individual', label: 'Individual Metrics', icon: <Users size={18} /> },
+  { id: 'epics', label: 'Epic Tracker', icon: <ClipboardList size={18} /> },
   { id: 'config', label: 'Settings', icon: <Settings size={18} /> },
 ];
+
+/** Tab visibility by persona — strict isolation, no cross-persona visibility */
+const TAB_VISIBILITY: Record<Persona, Set<string>> = {
+  engineering_manager: new Set(['home', 'attribution', 'metrics', 'individual', 'epics', 'config']),
+  individual: new Set(['home', 'individual', 'config']),
+  delivery_manager: new Set(['home', 'metrics', 'epics', 'attribution', 'config']),
+  management: new Set(['home', 'attribution', 'metrics', 'epics', 'config']),
+};
+
+// Backward compatible export for tests
+export const TABS = ALL_TABS;
 
 interface SidebarProps {
   activeTab: string;
@@ -25,9 +38,11 @@ interface SidebarProps {
   email?: string | null;
   onLogout?: () => void;
   onReset?: () => void;
+  persona?: Persona;
+  projectCount?: number;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, project, email, onLogout, onReset }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, project, email, onLogout, onReset, persona, projectCount }) => {
   const [version, setVersion] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,6 +52,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, project, emai
       }
     }).catch(() => {});
   }, []);
+
+  const visibleTabs = useMemo(() => {
+    if (!persona) return ALL_TABS;
+    const visible = TAB_VISIBILITY[persona];
+    return ALL_TABS.filter(tab => visible.has(tab.id));
+  }, [persona]);
 
   return (
     <aside className="w-56 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-r border-slate-700/30 flex flex-col flex-shrink-0">
@@ -54,14 +75,21 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, project, emai
             {project?.name || 'Uplift Forge'}
           </span>
           {project?.key && (
-            <span className="text-[10px] text-slate-500 font-mono">{project.key}</span>
+            <span className="text-[10px] text-slate-500 font-mono">
+              {project.key}
+              {projectCount && projectCount > 1 && (
+                <span className="ml-1.5 px-1.5 py-0.5 bg-indigo-500/15 text-indigo-400 rounded-full text-[9px] font-semibold">
+                  +{projectCount - 1}
+                </span>
+              )}
+            </span>
           )}
         </div>
       </div>
 
       {/* Nav items */}
       <nav className="flex-1 py-3 flex flex-col gap-0.5 px-2">
-        {TABS.map(tab => {
+        {visibleTabs.map(tab => {
           const isActive = activeTab === tab.id;
           return (
             <button

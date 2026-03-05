@@ -1,12 +1,33 @@
 import { BarChart3, Settings } from 'lucide-react';
 import type { ProjectInfo } from '../App';
+import type { Persona } from '../../shared/types';
 import logoSrc from '../../../assets/logo.png';
+
+const PERSONA_GREETINGS: Record<Persona, { title: string; subtitle: string }> = {
+  engineering_manager: {
+    title: 'Team Performance Hub',
+    subtitle: 'Cross-project insights — cycle time distribution, contribution spread, rework rate, and strategic team health indicators.',
+  },
+  individual: {
+    title: 'Your Performance Dashboard',
+    subtitle: 'Private personal metrics — track your cycle time, throughput, and growth trends over time.',
+  },
+  delivery_manager: {
+    title: 'Delivery Command Center',
+    subtitle: 'Flow metrics — CFD, lead time distribution, WIP aging, blocker analysis, and Monte Carlo forecasting.',
+  },
+  management: {
+    title: 'Organizational Health Radar',
+    subtitle: 'Cross-project delivery, quality, and efficiency metrics — bug escape rate, tech debt ratio, flow efficiency, and throughput trends.',
+  },
+};
 
 interface HomePageProps {
   project?: ProjectInfo | null;
+  persona?: Persona;
 }
 
-const HomePage: React.FC<HomePageProps> = ({ project }) => {
+const HomePage: React.FC<HomePageProps> = ({ project, persona }) => {
   return (
     <div className="flex flex-col h-full">
       {/* Page header */}
@@ -28,12 +49,16 @@ const HomePage: React.FC<HomePageProps> = ({ project }) => {
               className="text-3xl font-bold tracking-tight mb-2"
               style={{ background: 'linear-gradient(135deg, #f1f5f9, #818cf8, #a78bfa)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}
             >
-              {project?.name ? `${project.name}` : 'Welcome to Uplift Forge'}
+              {persona && PERSONA_GREETINGS[persona]
+                ? PERSONA_GREETINGS[persona].title
+                : project?.name ? `${project.name}` : 'Welcome to Uplift Forge'}
             </h2>
             <p className="text-slate-400 text-sm max-w-md mx-auto">
-              {project?.name
-                ? `Engineering performance dashboard for the ${project.name} team. Data-driven insights and automated JIRA field management.`
-                : 'A tool for uplifting engineering team performance through data-driven insights and automated JIRA field management.'}
+              {persona && PERSONA_GREETINGS[persona]
+                ? PERSONA_GREETINGS[persona].subtitle
+                : project?.name
+                  ? `Engineering performance dashboard for the ${project.name} team. Data-driven insights and automated JIRA field management.`
+                  : 'A tool for uplifting engineering team performance through data-driven insights and automated JIRA field management.'}
             </p>
           </div>
 

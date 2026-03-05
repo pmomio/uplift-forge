@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 vi.mock('../../api', () => ({
   getAiSuggestions: vi.fn(),
+  getConfig: vi.fn().mockResolvedValue({ data: { persona: 'engineering_manager' } }),
 }));
 
 import SuggestionPanel from '../SuggestionPanel';
