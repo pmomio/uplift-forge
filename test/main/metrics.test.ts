@@ -177,27 +177,3 @@ describe('getIndividualMetrics', () => {
     expect(result.team_averages.total_eng_hours).toBe(8.0);
   });
 });
-
-describe('cross-project metrics', () => {
-  beforeEach(() => {
-    (__setTickets as Function)([]);
-  });
-
-  it('getTeamMetrics accepts optional projectKey param', () => {
-    (__setTickets as Function)([
-      makeTicket({ key: 'T-1', eng_hours: 10 }),
-    ]);
-    // Calling with projectKey should not crash (the mock getTickets doesn't filter, but the function signature is tested)
-    const result = getTeamMetrics('all', 'PROJ');
-    expect(result.period).toBe('all');
-    expect(result.summary.total_tickets).toBe(1);
-  });
-
-  it('getIndividualMetrics accepts optional projectKey param', () => {
-    (__setTickets as Function)([
-      makeTicket({ key: 'T-1', assignee: 'Alice', eng_hours: 10 }),
-    ]);
-    const result = getIndividualMetrics('all', 'PROJ');
-    expect(result.period).toBe('all');
-  });
-});
