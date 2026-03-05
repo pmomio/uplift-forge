@@ -1,15 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Sparkles, X, AlertCircle, RefreshCw, Brain } from 'lucide-react';
-import { getAiSuggestions, getConfig } from '../api';
-import type { AiSuggestRequest, AiSuggestResponse, AiProvider, Persona } from '../../shared/types';
-
-const PERSONA_PANEL_TITLES: Record<Persona, string> = {
-  engineering_manager: 'AI Suggestions',
-  individual: 'Growth Suggestions',
-  delivery_manager: 'Risk Mitigation',
-  management: 'Strategic Insights',
-};
+import { getAiSuggestions } from '../api';
+import type { AiSuggestRequest, AiSuggestResponse, AiProvider } from '../../shared/types';
 
 interface SuggestionPanelProps {
   open: boolean;
@@ -110,16 +103,6 @@ const AiThinkingLoader = ({ provider }: { provider: string }) => {
 const SuggestionPanel: React.FC<SuggestionPanelProps> = ({ open, onClose, request, aiProvider }) => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AiSuggestResponse | null>(null);
-  const [persona, setPersona] = useState<Persona | undefined>(undefined);
-
-  useEffect(() => {
-    if (open) {
-      getConfig().then(res => {
-        const cfg = res.data as { persona?: Persona };
-        setPersona(cfg.persona);
-      }).catch(() => {});
-    }
-  }, [open]);
 
   const fetchSuggestions = async () => {
     if (!request) return;
@@ -178,7 +161,7 @@ const SuggestionPanel: React.FC<SuggestionPanelProps> = ({ open, onClose, reques
             <Sparkles size={16} className={`text-violet-400 ${loading ? 'animate-spin' : ''}`} style={loading ? { animationDuration: '3s' } : undefined} />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-bold text-slate-100">{persona ? PERSONA_PANEL_TITLES[persona] : 'AI Suggestions'}</h2>
+            <h2 className="text-sm font-bold text-slate-100">AI Suggestions</h2>
             <p className="text-[11px] text-slate-500 truncate">{request?.metricLabel || 'Metric'}</p>
           </div>
           <button

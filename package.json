@@ -12,11 +12,7 @@
     "lint": "eslint src/",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "test:e2e": "npx playwright test --config e2e/playwright.config.ts",
-    "test:e2e:headed": "npx playwright test --config e2e/playwright.config.ts --headed",
-    "test:e2e:debug": "PWDEBUG=1 npx playwright test --config e2e/playwright.config.ts",
-    "test:all": "npm test && npm run test:e2e"
+    "test:coverage": "vitest run --coverage"
   },
   "repository": {
     "type": "git",
@@ -41,7 +37,6 @@
     "@electron-forge/plugin-vite": "^7.6.0",
     "@electron-forge/publisher-github": "^7.11.1",
     "@eslint/js": "^9.39.1",
-    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4.2.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

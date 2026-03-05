@@ -6,11 +6,6 @@ vi.mock('../../src/main/auth/ai-key-store.js', () => ({
   getAiApiKey: vi.fn(),
 }));
 
-// Mock config.service module (ai.service imports getConfig for persona-aware prompts)
-vi.mock('../../src/main/services/config.service.js', () => ({
-  getConfig: vi.fn().mockReturnValue({ persona: 'engineering_manager' }),
-}));
-
 // Import after mocks
 import {
   buildUserPrompt,
@@ -20,18 +15,14 @@ import {
   testAiConnection,
 } from '../../src/main/services/ai.service.js';
 import { getAiProvider, getAiApiKey } from '../../src/main/auth/ai-key-store.js';
-import { getConfig } from '../../src/main/services/config.service.js';
 import type { AiSuggestRequest } from '../../src/shared/types.js';
 
 const mockProvider = vi.mocked(getAiProvider);
 const mockApiKey = vi.mocked(getAiApiKey);
-const mockGetConfig = vi.mocked(getConfig);
 
 describe('ai.service', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    // Re-set config mock after restoreAllMocks (which clears mock implementations)
-    mockGetConfig.mockReturnValue({ persona: 'engineering_manager' } as any);
   });
 
   describe('SYSTEM_PROMPT', () => {

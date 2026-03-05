@@ -12,14 +12,11 @@ if (started) {
 let mainWindow: BrowserWindow | null = null;
 
 const createWindow = (): void => {
-  const isHeadless = process.argv.includes('--headless');
-
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    show: !isHeadless,
     title: 'Uplift Forge',
     titleBarStyle: 'hiddenInset',
     backgroundColor: '#0f172a', // slate-900

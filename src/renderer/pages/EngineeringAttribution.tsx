@@ -3,21 +3,17 @@ import { RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import TicketTable from '../components/TicketTable';
 import TicketSummary from '../components/TicketSummary';
-import { getTickets, triggerSync, syncAllProjects } from '../api';
+import { getTickets, triggerSync } from '../api';
 import type { ProjectInfo } from '../App';
-import type { Persona } from '../../shared/types';
 
 export type MissingFilter = 'tpd_bu' | 'eng_hours' | 'work_stream' | null;
 
 interface EngineeringAttributionProps {
   refreshKey: number;
   project?: ProjectInfo | null;
-  persona?: Persona;
-  projectCount?: number;
 }
 
-const EngineeringAttribution: React.FC<EngineeringAttributionProps> = ({ refreshKey, project, persona, projectCount }) => {
-  const isMultiProject = (persona === 'engineering_manager' || persona === 'management') && (projectCount ?? 1) > 1;
+const EngineeringAttribution: React.FC<EngineeringAttributionProps> = ({ refreshKey, project }) => {
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -41,11 +37,7 @@ const EngineeringAttribution: React.FC<EngineeringAttributionProps> = ({ refresh
   const handleSync = useCallback(async () => {
     setSyncing(true);
     try {
-      if (isMultiProject) {
-        await syncAllProjects();
-      } else {
-        await triggerSync();
-      }
+      await triggerSync();
       const response = await getTickets();
       setTickets(response.data);
       setLastSynced(new Date().toLocaleTimeString());
@@ -56,7 +48,7 @@ const EngineeringAttribution: React.FC<EngineeringAttributionProps> = ({ refresh
     } finally {
       setSyncing(false);
     }
-  }, [isMultiProject]);
+  }, []);
 
   // On mount: load from cache only (no JIRA call)
   useEffect(() => {
@@ -76,7 +68,7 @@ const EngineeringAttribution: React.FC<EngineeringAttributionProps> = ({ refresh
       <div className="px-6 py-4 border-b border-slate-700/50 flex justify-between items-center flex-shrink-0">
         <div>
           <h1 className="text-lg font-semibold text-slate-100">
-            {isMultiProject ? 'All Projects — Engineering Attribution' : project?.name ? `${project.name} — Engineering Attribution` : 'Engineering Attribution'}
+            {project?.name ? `${project.name} — Engineering Attribution` : 'Engineering Attribution'}
           </h1>
           {lastSynced && (
             <p className="text-xs text-slate-400 mt-0.5">Last synced at {lastSynced}</p>
