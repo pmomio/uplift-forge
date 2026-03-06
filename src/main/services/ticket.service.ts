@@ -104,7 +104,7 @@ function loadPersistedCaches(): void {
   console.log(`[Tickets] Loaded ${total} cached tickets across ${Object.keys(persisted).length} projects from disk`);
 }
 
-function persistCaches(): void {
+export function persistCaches(): void {
   const projects: PersistedCacheV2['projects'] = {};
   for (const [projectKey, ticketMap] of projectTicketCaches) {
     const rawMap = projectRawCaches.get(projectKey);

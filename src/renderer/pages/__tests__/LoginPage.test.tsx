@@ -3,13 +3,14 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 vi.mock('../../api', () => ({
   login: vi.fn(),
+  demoLogin: vi.fn(),
 }));
 
 // Mock logo import
 vi.mock('../../../../assets/logo.png', () => ({ default: 'logo.png' }));
 
 import LoginPage from '../LoginPage';
-import { login } from '../../api';
+import { login, demoLogin } from '../../api';
 
 function getConsentButton() {
   // The consent checkbox is a <button> adjacent to the "I consent" text div
@@ -190,5 +191,18 @@ describe('LoginPage', () => {
     // Button is disabled, so handleLogin can't fire — this is correct behavior
     const btn = screen.getByText('Connect & Continue').closest('button');
     expect(btn).toBeDisabled();
+  });
+
+  it('calls demoLogin when Try Demo Mode is clicked', async () => {
+    (demoLogin as ReturnType<typeof vi.fn>).mockResolvedValue({ data: {} });
+    const onSuccess = vi.fn();
+    render(<LoginPage onLoginSuccess={onSuccess} />);
+    
+    fireEvent.click(screen.getByText('Try Demo Mode'));
+
+    await waitFor(() => {
+      expect(demoLogin).toHaveBeenCalled();
+      expect(onSuccess).toHaveBeenCalled();
+    });
   });
 });

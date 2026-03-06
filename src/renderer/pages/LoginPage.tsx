@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { LogIn, Loader2, ExternalLink, Check, ShieldAlert } from 'lucide-react';
-import { login } from '../api';
+import { LogIn, Loader2, ExternalLink, Check, ShieldAlert, Sparkles } from 'lucide-react';
+import { login, demoLogin } from '../api';
 import logoSrc from '../../../assets/logo.png';
 
 interface LoginPageProps {
@@ -34,6 +34,19 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     setError(null);
     try {
       await login(normalizedUrl, email.trim(), apiToken.trim());
+      onLoginSuccess();
+    } catch (e) {
+      setError(String(e instanceof Error ? e.message : e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemo = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await demoLogin();
       onLoginSuccess();
     } catch (e) {
       setError(String(e instanceof Error ? e.message : e));
@@ -137,6 +150,21 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               Connect & Continue
             </>
           )}
+        </button>
+
+        <div className="mt-4 flex items-center justify-center gap-4">
+          <div className="h-px bg-slate-700 flex-1"></div>
+          <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">OR</span>
+          <div className="h-px bg-slate-700 flex-1"></div>
+        </div>
+
+        <button
+          onClick={handleDemo}
+          disabled={loading}
+          className="w-full mt-4 flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium transition-all bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 hover:border-slate-600 shadow-lg cursor-pointer"
+        >
+          <Sparkles size={18} className="text-amber-400" />
+          Try Demo Mode
         </button>
 
         {/* Error */}

@@ -7,6 +7,7 @@ import { Channels } from '../shared/channels.js';
 const api = {
   // Auth
   login: (baseUrl: string, email: string, apiToken: string) => ipcRenderer.invoke(Channels.AUTH_LOGIN, baseUrl, email, apiToken),
+  demoLogin: () => ipcRenderer.invoke(Channels.AUTH_DEMO),
   logout: () => ipcRenderer.invoke(Channels.AUTH_LOGOUT),
   getAuthState: () => ipcRenderer.invoke(Channels.AUTH_STATE),
   resetApp: () => ipcRenderer.invoke(Channels.AUTH_RESET),

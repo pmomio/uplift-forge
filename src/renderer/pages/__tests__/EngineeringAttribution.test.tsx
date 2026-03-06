@@ -65,14 +65,14 @@ describe('EngineeringAttribution', () => {
     (getTickets as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [] });
     render(<EngineeringAttribution refreshKey={0} project={null} persona="engineering_manager" projectCount={1} />);
     await waitFor(() => {
-      expect(screen.getByText(/No tickets found/)).toBeInTheDocument();
+      expect(screen.getByText(/No tickets in cache/)).toBeInTheDocument();
     });
   });
 
   it('triggers full sync on button click', async () => {
     render(<EngineeringAttribution refreshKey={0} project={null} persona="engineering_manager" projectCount={1} />);
-    await waitFor(() => screen.getByText('Sync Cloud'));
-    fireEvent.click(screen.getByText('Sync Cloud'));
-    expect(triggerSync).toHaveBeenCalled();
+    await waitFor(() => screen.getByText('Sync Now'));
+    fireEvent.click(screen.getByText('Sync Now'));
+    await waitFor(() => expect(triggerSync).toHaveBeenCalled());
   });
 });

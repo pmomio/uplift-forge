@@ -13,6 +13,7 @@ import * as emMetricsService from '../services/em-metrics.service.js';
 import * as dmMetricsService from '../services/dm-metrics.service.js';
 import * as icMetricsService from '../services/ic-metrics.service.js';
 import * as ctoMetricsService from '../services/cto-metrics.service.js';
+import { setupDemoMode } from '../services/demo.service.js';
 import { saveAiConfig, getAiConfig, deleteAiConfig } from '../auth/ai-key-store.js';
 import * as aiService from '../services/ai.service.js';
 import type { AuthState, AiProvider, AiSuggestRequest, ProjectConfig } from '../../shared/types.js';
@@ -33,6 +34,11 @@ export function registerIpcHandlers(): void {
       // Re-throw so the renderer receives the error message
       throw e;
     }
+  });
+
+  ipcMain.handle(Channels.AUTH_DEMO, async () => {
+    await setupDemoMode();
+    return { status: 'authenticated', email: 'demo@example.com', baseUrl: 'https://demo.atlassian.net' } as AuthState;
   });
 
   ipcMain.handle(Channels.AUTH_LOGOUT, () => {

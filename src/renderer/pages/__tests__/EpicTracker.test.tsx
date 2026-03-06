@@ -6,14 +6,15 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 vi.mock('../../api', () => ({
-  listEpics: vi.fn(),
+  getEpics: vi.fn(),
   syncEpics: vi.fn(),
   getAiConfig: vi.fn(),
   getAiSuggestions: vi.fn(),
+  syncAllProjects: vi.fn(),
 }));
 
 import EpicTracker from '../EpicTracker';
-import { listEpics, syncEpics, getAiConfig, getAiSuggestions } from '../../api';
+import { getEpics, syncEpics, getAiConfig, getAiSuggestions, syncAllProjects } from '../../api';
 import toast from 'react-hot-toast';
 import type { EpicSummary } from '../../../shared/types';
 
@@ -53,7 +54,7 @@ const mockEpicHigh: EpicSummary = {
 describe('EpicTracker', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (listEpics as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [mockEpic, mockEpicHigh] });
+    (getEpics as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [mockEpic, mockEpicHigh] });
     (syncEpics as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [mockEpic, mockEpicHigh] });
     (getAiConfig as ReturnType<typeof vi.fn>).mockResolvedValue({ data: { provider: 'openai', hasKey: false } });
   });
@@ -75,18 +76,18 @@ describe('EpicTracker', () => {
   it('fetches epics on mount', async () => {
     render(<EpicTracker refreshKey={0} />);
     await waitFor(() => {
-      expect(listEpics).toHaveBeenCalled();
+      expect(getEpics).toHaveBeenCalled();
     });
   });
 
   it('shows loading state', () => {
-    (listEpics as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
+    (getEpics as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => {}));
     render(<EpicTracker refreshKey={0} />);
     expect(screen.getByText('Loading epics...')).toBeInTheDocument();
   });
 
   it('shows empty state when no epics', async () => {
-    (listEpics as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [] });
+    (getEpics as ReturnType<typeof vi.fn>).mockResolvedValue({ data: [] });
     render(<EpicTracker refreshKey={0} />);
     await waitFor(() => {
       expect(screen.getByText('No epics found')).toBeInTheDocument();
@@ -188,9 +189,9 @@ describe('EpicTracker', () => {
 
   it('refetches when refreshKey changes', async () => {
     const { rerender } = render(<EpicTracker refreshKey={0} />);
-    await waitFor(() => expect(listEpics).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getEpics).toHaveBeenCalledTimes(1));
     rerender(<EpicTracker refreshKey={1} />);
-    await waitFor(() => expect(listEpics).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(getEpics).toHaveBeenCalledTimes(2));
   });
 
   it('shows AI Risk Analysis button when expanded and AI configured', async () => {

@@ -3,6 +3,7 @@
 export const Channels = {
   // Auth
   AUTH_LOGIN: 'auth:login',
+  AUTH_DEMO: 'auth:demo',
   AUTH_LOGOUT: 'auth:logout',
   AUTH_STATE: 'auth:state',
   AUTH_STATE_CHANGED: 'auth:state-changed',

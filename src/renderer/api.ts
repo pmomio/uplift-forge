@@ -13,6 +13,7 @@ function wrap<T>(promise: Promise<T>): AxiosLikeResponse<T> {
 
 // Auth
 export const login = (baseUrl: string, email: string, apiToken: string) => wrap(window.api.login(baseUrl, email, apiToken));
+export const demoLogin = () => wrap(window.api.demoLogin());
 export const logout = () => wrap(window.api.logout());
 export const getAuthState = () => wrap(window.api.getAuthState());
 export const resetApp = () => wrap(window.api.resetApp());
