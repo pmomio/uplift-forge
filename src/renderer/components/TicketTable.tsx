@@ -1,576 +1,483 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Save, ExternalLink, RefreshCw, Calculator, ArrowUp, ArrowDown, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { 
+  Search, 
+  ExternalLink, 
+  Save, 
+  RefreshCw, 
+  Filter, 
+  Download, 
+  MoreHorizontal,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  AlertCircle,
+  Calculator,
+  User,
+  Zap,
+  Tag,
+  Clock,
+  History,
+  Info,
+  BarChart2
+} from 'lucide-react';
 import toast from 'react-hot-toast';
-import { updateTicket, syncSingleTicket, calculateHours, calculateFields } from '../api';
-import type { MissingFilter } from '../pages/EngineeringAttribution';
-
-type SortDirection = 'asc' | 'desc';
-interface SortState {
-  column: string | null;
-  direction: SortDirection;
-}
-
-interface Ticket {
-  key: string;
-  summary: string;
-  status: string;
-  assignee: string;
-  eng_hours: number | null;
-  tpd_bu: string | null;
-  work_stream: string | null;
-  has_computed_values: boolean;
-  base_url: string;
-}
+import { updateTicket, syncOneTicket, calcTicketFields } from '../api';
+import type { ProcessedTicket, MappingRules } from '../../shared/types';
+import ModalDialog from './ModalDialog';
 
 interface TicketTableProps {
-  tickets: Ticket[];
-  onUpdate: () => void;
-  missingFilter: MissingFilter;
-  onClearFilter: () => void;
+  tickets: ProcessedTicket[];
+  loading: boolean;
+  onRefresh: () => void;
+  activeFilter: string | null;
 }
 
-const statusColors: Record<string, string> = {
-  'Done': 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/30',
-  'Closed': 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/30',
-  'Resolved': 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/30',
-  'Rejected': 'bg-rose-500/15 text-rose-300 ring-rose-400/30',
-  'Cancelled': 'bg-rose-500/15 text-rose-300 ring-rose-400/30',
-};
-const defaultStatusColor = 'bg-sky-500/15 text-sky-300 ring-sky-400/30';
-
-const filterLabels: Record<string, string> = {
-  tpd_bu: 'TPD BU',
-  eng_hours: 'Eng Hours',
+const COLUMN_LABELS: Record<string, string> = {
+  key: 'Key',
+  summary: 'Summary',
+  assignee: 'Assignee',
+  status: 'Status',
+  tpd_bu: 'Business Unit',
   work_stream: 'Work Stream',
+  story_points: 'SP',
 };
 
-const TicketTable: React.FC<TicketTableProps> = ({ tickets, onUpdate, missingFilter, onClearFilter }) => {
-  const [editing, setEditing] = useState<Record<string, Partial<Ticket>>>({});
-  const [saving, setSaving] = useState<string | null>(null);
-  const [syncingRow, setSyncingRow] = useState<string | null>(null);
-  const [calculating, setCalculating] = useState<Record<string, boolean>>({});
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
-
-  const SORT_STORAGE_KEY = 'uplift-forge-sort';
-
-  const [sort, setSort] = useState<SortState>(() => {
-    try {
-      const stored = localStorage.getItem(SORT_STORAGE_KEY);
-      if (stored) return JSON.parse(stored);
-    } catch {}
-    return { column: null, direction: 'asc' };
-  });
+const TicketTable: React.FC<TicketTableProps> = ({ tickets, loading, onRefresh, activeFilter }) => {
+  const [searchTerm, setSearchSetTerm] = useState('');
+  const [sortField, setSortField] = useState<keyof ProcessedTicket>('updated');
+  const [sortOrder, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [pendingChanges, setPendingChanges] = useState<Record<string, Partial<ProcessedTicket>>>({});
+  const [savingKeys, setSavingKeys] = useState<Set<string>>(new Set());
+  const [calculatingKeys, setCalculatingKeys] = useState<Set<string>>(new Set());
+  const [missingFilter, setMissingFilter] = useState<string | null>(activeFilter);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(sort));
-    } catch {}
-  }, [sort]);
+    setMissingFilter(activeFilter);
+  }, [activeFilter]);
 
-  const handleSort = useCallback((column: string) => {
-    setSort(prev => {
-      if (prev.column === column) {
-        return { column, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
-      }
-      return { column, direction: 'asc' };
-    });
-    setCurrentPage(1);
-  }, []);
-
-  const resetSort = useCallback(() => {
-    setSort({ column: null, direction: 'asc' });
-    setCurrentPage(1);
-  }, []);
-
-  // Reset to page 1 when filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [missingFilter]);
+  const handleSort = (field: keyof ProcessedTicket) => {
+    if (sortField === field) {
+      setSortDirection(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
 
   const filteredTickets = useMemo(() => {
-    if (!missingFilter) return tickets;
     return tickets.filter(t => {
+      const matchesSearch = 
+        t.key.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        t.assignee.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      if (!matchesSearch) return false;
+
       if (missingFilter === 'tpd_bu') return !t.tpd_bu;
-      if (missingFilter === 'eng_hours') return t.eng_hours == null;
       if (missingFilter === 'work_stream') return !t.work_stream;
+      if (missingFilter === 'story_points') return t.story_points == null;
+      
       return true;
+    }).sort((a, b) => {
+      const aVal = a[sortField];
+      const bVal = b[sortField];
+      if (aVal == null) return sortOrder === 'asc' ? -1 : 1;
+      if (bVal == null) return sortOrder === 'asc' ? 1 : -1;
+      
+      const comparison = String(aVal).localeCompare(String(bVal), undefined, { numeric: true });
+      return sortOrder === 'asc' ? comparison : -comparison;
     });
-  }, [tickets, missingFilter]);
-
-  const sortedTickets = useMemo(() => {
-    if (!sort.column) return filteredTickets;
-    return [...filteredTickets].sort((a, b) => {
-      const col = sort.column as keyof Ticket;
-      let aVal = a[col];
-      let bVal = b[col];
-      // Nulls/empty always sort last
-      if (aVal == null || aVal === '') return 1;
-      if (bVal == null || bVal === '') return -1;
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return sort.direction === 'asc' ? aVal - bVal : bVal - aVal;
-      }
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-      const cmp = aStr.localeCompare(bStr);
-      return sort.direction === 'asc' ? cmp : -cmp;
-    });
-  }, [filteredTickets, sort]);
-
-  const totalPages = Math.ceil(sortedTickets.length / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const paginatedTickets = sortedTickets.slice(startIndex, startIndex + pageSize);
+  }, [tickets, searchTerm, sortField, sortOrder, missingFilter]);
 
   const handleFieldChange = (key: string, field: string, value: any) => {
-    setEditing(prev => ({
+    setPendingChanges(prev => ({
       ...prev,
-      [key]: { ...(prev[key] || {}), [field]: value }
+      [key]: { ...prev[key], [field]: value }
     }));
   };
 
   const handleSave = async (key: string) => {
-    if (saving) return;
-    setSaving(key);
+    const changes = pendingChanges[key];
+    if (!changes) {
+      setEditingKey(null);
+      return;
+    }
+
+    setSavingKeys(prev => new Set(prev).add(key));
     try {
       const ticket = tickets.find(t => t.key === key);
-      const merged = { ...ticket, ...(editing[key] || {}) };
-      const payload: Record<string, any> = {};
-      if (merged.tpd_bu) payload.tpd_bu = merged.tpd_bu;
-      if (merged.eng_hours != null) payload.eng_hours = merged.eng_hours;
-      if (merged.work_stream) payload.work_stream = merged.work_stream;
+      const merged = { ...ticket, ...changes };
+      
+      // Map to JIRA payload
+      const payload: any = {};
+      if ('tpd_bu' in changes) payload.tpd_bu = changes.tpd_bu;
+      if ('work_stream' in changes) payload.work_stream = changes.work_stream;
+      
       await updateTicket(key, payload);
-      toast.success(`Saved ${key} to JIRA`, { id: `save-${key}` });
-      const newEditing = { ...editing };
-      delete newEditing[key];
-      setEditing(newEditing);
-      onUpdate();
-    } catch (error: any) {
-      console.error('Failed to save ticket', error);
-      const detail = error?.response?.data?.detail || error.message || 'Unknown error';
-      toast.error(`Failed to save ticket: ${detail}`, { id: `save-err-${key}` });
+      
+      // Update local state by refreshing
+      onRefresh();
+      
+      const nextChanges = { ...pendingChanges };
+      delete nextChanges[key];
+      setPendingChanges(nextChanges);
+      setEditingKey(null);
+      toast.success(`${key} updated`);
+    } catch (err) {
+      console.error('Failed to save ticket', err);
+      toast.error(`Failed to update ${key}`);
     } finally {
-      setSaving(null);
+      setSavingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
     }
   };
 
-  const handleCalculateHours = async (key: string) => {
-    setCalculating(prev => ({ ...prev, [`${key}:hours`]: true }));
+  const handleSyncOne = async (key: string) => {
+    setCalculatingKeys(prev => new Set(prev).add(key));
     try {
-      const res = await calculateHours(key);
-      if (res.data.hours !== null) {
-        handleFieldChange(key, 'eng_hours', res.data.hours);
-      } else {
-        const diag = res.data.diagnostics;
-        if (diag) {
-          const transitions = diag.statusTransitions.map((t: any) => `${t.from} → ${t.to}`).join(', ');
-          console.warn(`[Hours] Calc failed for ${key}. Looking for: "${diag.configuredStart}" → "${diag.configuredEnd}". Found transitions: ${transitions}`);
-          toast.error(
-            `No match. Looking for "${diag.configuredStart}" → "${diag.configuredEnd}" but found: ${transitions || 'none'}`,
-            { id: `calc-hours-${key}`, duration: 8000 },
-          );
-        } else {
-          toast.error('Could not calculate hours (no matching status transitions found)', { id: `calc-hours-${key}` });
-        }
-      }
-    } catch (error) {
-      console.error('Failed to calculate hours', error);
-      toast.error('Failed to calculate hours', { id: `calc-hours-err-${key}` });
+      await syncOneTicket(key);
+      onRefresh();
+      toast.success(`${key} synced from JIRA`);
+    } catch (err) {
+      toast.error(`Sync failed for ${key}`);
     } finally {
-      setCalculating(prev => ({ ...prev, [`${key}:hours`]: false }));
+      setCalculatingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
     }
   };
 
-  const handleCalculateFields = async (key: string, field: 'tpd_bu' | 'work_stream') => {
-    setCalculating(prev => ({ ...prev, [`${key}:${field}`]: true }));
+  const handleCalcFields = async (key: string) => {
+    setCalculatingKeys(prev => new Set(prev).add(key));
     try {
-      const res = await calculateFields(key);
-      const value = res.data[field];
-      if (value) {
-        handleFieldChange(key, field, value);
-      } else {
-        toast.error(`Could not compute ${field === 'tpd_bu' ? 'TPD BU' : 'Work Stream'} (no parent mapping found)`, { id: `calc-${field}-${key}` });
-      }
-    } catch (error) {
-      console.error(`Failed to calculate ${field}`, error);
-      toast.error(`Failed to calculate ${field === 'tpd_bu' ? 'TPD BU' : 'Work Stream'}`, { id: `calc-${field}-err-${key}` });
+      const res = await calcTicketFields(key);
+      if (res.data.tpd_bu) handleFieldChange(key, 'tpd_bu', res.data.tpd_bu);
+      if (res.data.work_stream) handleFieldChange(key, 'work_stream', res.data.work_stream);
+      toast.success(`Inferred fields for ${key}`);
+    } catch (err) {
+      toast.error(`Calculation failed for ${key}`);
     } finally {
-      setCalculating(prev => ({ ...prev, [`${key}:${field}`]: false }));
+      setCalculatingKeys(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
     }
   };
 
-  const handleSyncSingle = async (key: string) => {
-    setSyncingRow(key);
-    try {
-      await syncSingleTicket(key);
-      onUpdate();
-    } catch (error) {
-      console.error('Failed to sync ticket', error);
-      toast.error('Sync failed for ticket ' + key, { id: `sync-err-${key}` });
-    } finally {
-      setSyncingRow(null);
-    }
+  const cancelEdit = (key: string) => {
+    const nextChanges = { ...pendingChanges };
+    delete nextChanges[key];
+    setPendingChanges(nextChanges);
+    setEditingKey(null);
   };
 
-  const [calcAllRunning, setCalcAllRunning] = useState(false);
-  const [calcAllProgress, setCalcAllProgress] = useState({ done: 0, total: 0 });
-
-  const handleCalculateAll = async () => {
-    const targets = paginatedTickets;
-    if (targets.length === 0) return;
-    setCalcAllRunning(true);
-    setCalcAllProgress({ done: 0, total: targets.length });
-
-    for (let i = 0; i < targets.length; i++) {
-      const ticket = targets[i];
-      const key = ticket.key;
-      try {
-        const [hoursRes, fieldsRes] = await Promise.all([
-          calculateHours(key).catch(() => null),
-          calculateFields(key).catch(() => null),
-        ]);
-        if (hoursRes?.data?.hours != null) {
-          handleFieldChange(key, 'eng_hours', hoursRes.data.hours);
-        }
-        if (fieldsRes?.data?.tpd_bu) {
-          handleFieldChange(key, 'tpd_bu', fieldsRes.data.tpd_bu);
-        }
-        if (fieldsRes?.data?.work_stream) {
-          handleFieldChange(key, 'work_stream', fieldsRes.data.work_stream);
-        }
-      } catch {
-        // Silently keep previous values
-      }
-      setCalcAllProgress({ done: i + 1, total: targets.length });
-    }
-
-    setCalcAllRunning(false);
-    toast.success(`Calculated ${targets.length} tickets`, { id: 'calc-all' });
+  const exportCsv = () => {
+    const headers = ['Key', 'Summary', 'Assignee', 'Status', 'Business Unit', 'Work Stream', 'Story Points'];
+    const rows = filteredTickets.map(t => [
+      t.key,
+      `"${t.summary.replace(/"/g, '""')}"`,
+      t.assignee,
+      t.status,
+      t.tpd_bu || '',
+      t.work_stream || '',
+      t.story_points || ''
+    ]);
+    
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `engineering-attribution-${new Date().toISOString().split('T')[0]}.csv`);
+    link.click();
   };
 
-  const [saveAllRunning, setSaveAllRunning] = useState(false);
-  const [saveAllProgress, setSaveAllProgress] = useState({ done: 0, total: 0 });
-
-  const dirtyKeys = paginatedTickets.filter(t => editing[t.key] || t.has_computed_values).map(t => t.key);
-
-  const handleSaveAll = async () => {
-    if (dirtyKeys.length === 0) return;
-    const keysToSave = [...dirtyKeys];
-    setSaveAllRunning(true);
-    setSaveAllProgress({ done: 0, total: keysToSave.length });
-    let saved = 0;
-    let failed = 0;
-    const savedKeys: string[] = [];
-
-    for (let i = 0; i < keysToSave.length; i++) {
-      const key = keysToSave[i];
-      try {
-        const ticket = tickets.find(t => t.key === key);
-        const merged = { ...ticket, ...(editing[key] || {}) };
-        const payload: Record<string, any> = {};
-        if (merged.tpd_bu) payload.tpd_bu = merged.tpd_bu;
-        if (merged.eng_hours != null) payload.eng_hours = merged.eng_hours;
-        if (merged.work_stream) payload.work_stream = merged.work_stream;
-        await updateTicket(key, payload);
-        savedKeys.push(key);
-        saved++;
-      } catch {
-        failed++;
-      }
-      setSaveAllProgress({ done: i + 1, total: keysToSave.length });
-    }
-
-    // Batch-clear all saved keys from editing state
-    setEditing(prev => {
-      const next = { ...prev };
-      for (const key of savedKeys) delete next[key];
-      return next;
-    });
-
-    setSaveAllRunning(false);
-    if (failed === 0) {
-      toast.success(`Saved ${saved} tickets to JIRA`, { id: 'save-all' });
-    } else {
-      toast.error(`Saved ${saved}, failed ${failed}`, { id: 'save-all' });
-    }
-    onUpdate();
+  const renderSortIcon = (field: keyof ProcessedTicket) => {
+    if (sortField !== field) return <MoreHorizontal size={14} className="opacity-0 group-hover:opacity-50" />;
+    return sortOrder === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />;
   };
-
-  const CalcButton = ({ onClick, loading, title }: { onClick: () => void; loading: boolean; title: string }) => (
-    <button
-      onClick={onClick}
-      disabled={loading}
-      className="text-slate-500 hover:text-amber-400 hover:bg-amber-400/10 p-1 rounded-md transition-colors flex-shrink-0"
-      title={title}
-    >
-      <Calculator size={14} className={loading ? 'animate-pulse' : ''} />
-    </button>
-  );
 
   return (
-    <div className="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 overflow-hidden shadow-xl shadow-black/20">
-      {/* Toolbar */}
-      <div className="px-4 py-2.5 border-b border-slate-700/40 flex items-center justify-between bg-slate-800/60">
-        <span className="text-xs text-slate-500">
-          {sortedTickets.length} ticket{sortedTickets.length !== 1 ? 's' : ''}
-          {missingFilter && ` (filtered from ${tickets.length})`}
-        </span>
-        <div className="flex items-center gap-2">
+    <div className="flex flex-col h-full bg-slate-900">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+        <div className="relative w-full md:w-96 group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={18} />
+          <input
+            type="text"
+            placeholder="Search key, summary, or engineer..."
+            value={searchTerm}
+            onChange={(e) => setSearchSetTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all text-sm"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-lg p-1">
+            <button 
+              onClick={() => setMissingFilter(null)}
+              className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${!missingFilter ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              All
+            </button>
+            <button 
+              onClick={() => setMissingFilter('tpd_bu')}
+              className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${missingFilter === 'tpd_bu' ? 'bg-rose-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              Missing BU
+            </button>
+            <button 
+              onClick={() => setMissingFilter('work_stream')}
+              className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${missingFilter === 'work_stream' ? 'bg-rose-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              Missing WS
+            </button>
+          </div>
+
+          <div className="h-8 w-px bg-slate-700 mx-1 hidden md:block"></div>
+
           <button
-            onClick={handleCalculateAll}
-            disabled={calcAllRunning || saveAllRunning || paginatedTickets.length === 0}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 px-3 py-1.5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Calculate eng hours, TPD BU, and work stream for all tickets on this page"
+            onClick={onRefresh}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg transition-all text-sm font-medium disabled:opacity-50 cursor-pointer"
           >
-            <Calculator size={13} className={calcAllRunning ? 'animate-pulse' : ''} />
-            {calcAllRunning
-              ? `Calculating ${calcAllProgress.done}/${calcAllProgress.total}...`
-              : 'Calculate All'}
+            <RefreshCw className={loading ? 'animate-spin' : ''} size={16} />
+            {loading ? 'Syncing...' : 'Sync Cloud'}
           </button>
+
           <button
-            onClick={handleSaveAll}
-            disabled={saveAllRunning || calcAllRunning || dirtyKeys.length === 0}
-            className={`inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
-              dirtyKeys.length > 0
-                ? 'text-indigo-300 hover:text-indigo-200 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20'
-                : 'text-slate-500 bg-slate-700/20 border border-slate-700/30'
-            }`}
-            title="Save all modified tickets to JIRA"
+            onClick={exportCsv}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 rounded-lg transition-all text-sm font-medium cursor-pointer"
           >
-            <Save size={13} className={saveAllRunning ? 'animate-pulse' : ''} />
-            {saveAllRunning
-              ? `Saving ${saveAllProgress.done}/${saveAllProgress.total}...`
-              : `Save All${dirtyKeys.length > 0 ? ` (${dirtyKeys.length})` : ''}`}
+            <Download size={16} />
+            Export
           </button>
         </div>
       </div>
-      {missingFilter && (
-        <div className="px-4 py-2 bg-rose-500/10 border-b border-rose-500/20 flex items-center justify-between">
-          <span className="text-xs text-rose-300">
-            Showing tickets with missing <span className="font-semibold">{filterLabels[missingFilter]}</span>
-            <span className="text-rose-400/60 ml-1.5">({sortedTickets.length} ticket{sortedTickets.length !== 1 ? 's' : ''})</span>
-          </span>
-          <button
-            onClick={onClearFilter}
-            className="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 hover:bg-slate-700/50 px-2 py-0.5 rounded transition-colors"
-          >
-            <X size={12} />
-            Clear filter
-          </button>
-        </div>
-      )}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm table-auto">
-          <thead>
-            <tr className="border-b border-slate-700/60 bg-slate-800/80">
-              {([
-                { key: 'key', label: 'Key' },
-                { key: 'summary', label: 'Summary' },
-                { key: 'status', label: 'Status' },
-                { key: 'assignee', label: 'Assignee' },
-                { key: 'tpd_bu', label: 'TPD BU' },
-                { key: 'eng_hours', label: 'Eng Hours' },
-                { key: 'work_stream', label: 'Work Stream' },
-              ] as const).map(col => (
-                <th
-                  key={col.key}
-                  onClick={() => handleSort(col.key)}
-                  className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer select-none hover:text-slate-200 hover:bg-slate-700/30 transition-colors duration-150"
-                >
-                  <span className="inline-flex items-center gap-1">
-                    {col.label}
-                    {sort.column === col.key && (
-                      sort.direction === 'asc'
-                        ? <ArrowUp size={12} className="text-indigo-400" />
-                        : <ArrowDown size={12} className="text-indigo-400" />
-                    )}
-                  </span>
+
+      <div className="flex-1 min-h-0 bg-slate-800/30 border border-slate-700/50 rounded-2xl overflow-hidden shadow-xl flex flex-col">
+        <div className="overflow-x-auto flex-1 custom-scrollbar">
+          <table className="w-full text-left border-collapse table-fixed">
+            <thead className="sticky top-0 z-20 bg-slate-800 border-b border-slate-700 shadow-sm">
+              <tr>
+                <th onClick={() => handleSort('key')} className="w-32 px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest cursor-pointer group hover:text-indigo-400 transition-colors">
+                  <div className="flex items-center gap-2">Key {renderSortIcon('key')}</div>
                 </th>
-              ))}
-              <th className="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                <span className="inline-flex items-center gap-1.5">
-                  Actions
-                  {sort.column && (
-                    <button
-                      onClick={resetSort}
-                      className="text-slate-500 hover:text-rose-400 hover:bg-rose-400/10 p-0.5 rounded transition-colors"
-                      title="Reset sorting"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
-                </span>
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-700/40">
-            {paginatedTickets.map((ticket, index) => {
-              const isDirty = !!editing[ticket.key];
-              const currentValues = { ...ticket, ...(editing[ticket.key] || {}) };
-              const rowBg = isDirty
-                ? 'bg-amber-500/8'
-                : index % 2 === 0
-                  ? 'bg-transparent'
-                  : 'bg-slate-700/15';
-
-              return (
-                <tr key={ticket.key} className={`${rowBg} hover:bg-indigo-500/8 transition-colors duration-150`}>
-                  {/* Key */}
-                  <td className="px-4 py-2.5 whitespace-nowrap">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono text-sm font-medium text-indigo-300">{ticket.key}</span>
-                      <button
-                        onClick={() => window.api?.openExternal?.(`${ticket.base_url}/browse/${ticket.key}`)}
-                        className="text-slate-500 hover:text-indigo-400 transition-colors flex-shrink-0"
-                        title="Open in browser"
-                      >
-                        <ExternalLink size={12} />
-                      </button>
-                    </div>
-                  </td>
-
-                  {/* Summary */}
-                  <td className="px-4 py-2.5 max-w-[180px] lg:max-w-xs xl:max-w-md">
-                    <span className="text-slate-200 truncate block" title={ticket.summary}>
-                      {ticket.summary}
-                    </span>
-                  </td>
-
-                  {/* Status */}
-                  <td className="px-4 py-2.5 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ring-1 ring-inset ${statusColors[ticket.status] || defaultStatusColor}`}>
-                      {ticket.status}
-                    </span>
-                  </td>
-
-                  {/* Assignee */}
-                  <td className="px-4 py-2.5 whitespace-nowrap text-slate-300">{ticket.assignee}</td>
-
-                  {/* TPD BU */}
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-1">
-                      <select
-                        className="bg-slate-700/60 border border-slate-600/60 text-slate-200 text-sm rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400/50 transition-shadow cursor-pointer min-w-[110px]"
-                        value={currentValues.tpd_bu || ''}
-                        onChange={(e) => handleFieldChange(ticket.key, 'tpd_bu', e.target.value)}
-                      >
-                        <option value="">Not set</option>
-                        <option value="B2C">B2C</option>
-                        <option value="B2B">B2B</option>
-                        <option value="Global Expansion">Global Expansion</option>
-                        <option value="O4B">O4B</option>
-                        <option value="Rome2Rio">Rome2Rio</option>
-                        <option value="Omio.AI">Omio.AI</option>
-                      </select>
-                      <CalcButton
-                        onClick={() => handleCalculateFields(ticket.key, 'tpd_bu')}
-                        loading={calculating[`${ticket.key}:tpd_bu`]}
-                        title="Recalculate from parent mapping"
-                      />
-                    </div>
-                  </td>
-
-                  {/* Eng Hours */}
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        step="0.1"
-                        className="bg-slate-700/60 border border-slate-600/60 text-slate-200 text-sm rounded-md w-16 px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400/50 transition-shadow tabular-nums placeholder-slate-500"
-                        value={currentValues.eng_hours === null ? '' : currentValues.eng_hours}
-                        placeholder="--"
-                        onChange={(e) => handleFieldChange(ticket.key, 'eng_hours', parseFloat(e.target.value))}
-                      />
-                      <CalcButton
-                        onClick={() => handleCalculateHours(ticket.key)}
-                        loading={calculating[`${ticket.key}:hours`]}
-                        title="Recalculate from status transitions"
-                      />
-                    </div>
-                  </td>
-
-                  {/* Work Stream */}
-                  <td className="px-4 py-2.5">
-                    <div className="flex items-center gap-1">
-                      <select
-                        className="bg-slate-700/60 border border-slate-600/60 text-slate-200 text-sm rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400/50 transition-shadow cursor-pointer min-w-[110px]"
-                        value={currentValues.work_stream || ''}
-                        onChange={(e) => handleFieldChange(ticket.key, 'work_stream', e.target.value)}
-                      >
-                        <option value="">Not set</option>
-                        <option value="Operational">Operational</option>
-                        <option value="Product">Product</option>
-                        <option value="Tech Meta Backlog">Tech Meta Backlog</option>
-                      </select>
-                      <CalcButton
-                        onClick={() => handleCalculateFields(ticket.key, 'work_stream')}
-                        loading={calculating[`${ticket.key}:work_stream`]}
-                        title="Recalculate from parent mapping"
-                      />
-                    </div>
-                  </td>
-
-                  {/* Actions */}
-                  <td className="px-4 py-2.5 whitespace-nowrap">
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => handleSyncSingle(ticket.key)}
-                        disabled={syncingRow === ticket.key}
-                        className="text-slate-500 hover:text-sky-400 hover:bg-sky-400/10 p-1.5 rounded-md transition-colors"
-                        title="Sync from JIRA"
-                      >
-                        <RefreshCw size={14} className={syncingRow === ticket.key ? 'animate-spin' : ''} />
-                      </button>
-                      <button
-                        onClick={() => handleSave(ticket.key)}
-                        disabled={(!isDirty && !ticket.has_computed_values) || saving === ticket.key}
-                        className={`inline-flex items-center gap-1 rounded-md text-xs font-medium px-2.5 py-1.5 transition-all ${
-                          isDirty || ticket.has_computed_values
-                            ? 'text-white bg-indigo-500 hover:bg-indigo-400 active:bg-indigo-600 shadow-sm shadow-indigo-500/25'
-                            : 'text-slate-500 bg-slate-700/40 cursor-not-allowed'
-                        }`}
-                      >
-                        {saving === ticket.key ? (
-                          <RefreshCw size={12} className="animate-spin" />
-                        ) : (
-                          <Save size={12} />
-                        )}
-                        <span>Save</span>
-                      </button>
+                <th onClick={() => handleSort('summary')} className="w-96 px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest cursor-pointer group hover:text-indigo-400 transition-colors">
+                  <div className="flex items-center gap-2">Summary {renderSortIcon('summary')}</div>
+                </th>
+                <th onClick={() => handleSort('assignee')} className="w-48 px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest cursor-pointer group hover:text-indigo-400 transition-colors">
+                  <div className="flex items-center gap-2">Assignee {renderSortIcon('assignee')}</div>
+                </th>
+                <th onClick={() => handleSort('tpd_bu')} className="w-48 px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest cursor-pointer group hover:text-indigo-400 transition-colors">
+                  <div className="flex items-center gap-2">Business Unit {renderSortIcon('tpd_bu')}</div>
+                </th>
+                <th onClick={() => handleSort('work_stream')} className="w-48 px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest cursor-pointer group hover:text-indigo-400 transition-colors">
+                  <div className="flex items-center gap-2">Work Stream {renderSortIcon('work_stream')}</div>
+                </th>
+                <th onClick={() => handleSort('story_points')} className="w-20 px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest cursor-pointer group hover:text-indigo-400 transition-colors text-center">
+                  <div className="flex items-center justify-center gap-2">SP {renderSortIcon('story_points')}</div>
+                </th>
+                <th className="w-24 px-4 py-4 text-xs font-bold text-slate-400 uppercase tracking-widest text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/50">
+              {filteredTickets.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-20 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center text-slate-600">
+                        <Filter size={32} />
+                      </div>
+                      <div className="text-slate-400 font-medium">No tickets found matching your criteria</div>
+                      <button onClick={() => { setSearchSetTerm(''); setMissingFilter(null); }} className="text-indigo-400 hover:underline text-sm cursor-pointer">Clear all filters</button>
                     </div>
                   </td>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+              ) : (
+                filteredTickets.map((ticket) => {
+                  const isEditing = editingKey === ticket.key;
+                  const isSaving = savingKeys.has(ticket.key);
+                  const isCalculating = calculatingKeys.has(ticket.key);
+                  const currentValues = { ...ticket, ...(pendingChanges[ticket.key] || {}) };
+                  const hasChanges = !!pendingChanges[ticket.key];
 
-      {/* Pagination */}
-      <div className="flex justify-between items-center px-4 py-3 border-t border-slate-700/50 bg-slate-800/40">
-        <p className="text-sm text-slate-400">
-          Showing <span className="font-medium text-slate-300">{sortedTickets.length > 0 ? startIndex + 1 : 0}</span> to{' '}
-          <span className="font-medium text-slate-300">{Math.min(startIndex + pageSize, sortedTickets.length)}</span> of{' '}
-          <span className="font-medium text-slate-300">{sortedTickets.length}</span> tickets
-          {missingFilter && <span className="text-slate-500 ml-1">(filtered from {tickets.length})</span>}
-        </p>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-            className="px-3 py-1.5 text-sm font-medium text-slate-300 bg-slate-700/50 border border-slate-600/50 rounded-md hover:bg-slate-700 hover:border-slate-500/50 active:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
-          >
-            Previous
-          </button>
-          <span className="px-2 text-sm font-medium text-slate-400">
-            {currentPage} / {totalPages}
-          </span>
-          <button
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-            className="px-3 py-1.5 text-sm font-medium text-slate-300 bg-slate-700/50 border border-slate-600/50 rounded-md hover:bg-slate-700 hover:border-slate-500/50 active:bg-slate-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-150"
-          >
-            Next
-          </button>
+                  return (
+                    <tr 
+                      key={ticket.key} 
+                      className={`group hover:bg-slate-700/30 transition-colors border-l-2 ${isEditing ? 'bg-indigo-500/5 border-indigo-500' : 'border-transparent'}`}
+                    >
+                      <td className="px-4 py-4 align-top">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-indigo-400 group-hover:text-indigo-300 transition-colors">{ticket.key}</span>
+                          <button
+                            onClick={() => window.api.openExternal(`${ticket.base_url}/browse/${ticket.key}`)}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 transition-all cursor-pointer"
+                            title="Open in JIRA"
+                          >
+                            <ExternalLink size={12} />
+                          </button>
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter ${
+                            ticket.priority === 'Highest' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
+                            ticket.priority === 'High' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+                            'bg-slate-700/50 text-slate-400'
+                          }`}>
+                            {ticket.priority}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-400 uppercase font-bold tracking-tighter">
+                            {ticket.issue_type}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <div className="text-sm font-medium text-slate-200 line-clamp-2 leading-relaxed" title={ticket.summary}>
+                          {ticket.summary}
+                        </div>
+                        {ticket.parent_key && (
+                          <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-slate-500 font-medium">
+                            <Tag size={10} className="text-slate-600" />
+                            <span className="text-slate-600">Epic:</span>
+                            <span className="text-indigo-400/70 hover:underline cursor-pointer" onClick={() => window.api.openExternal(`${ticket.base_url}/browse/${ticket.parent_key}`)}>
+                              {ticket.parent_key}
+                            </span>
+                            <span className="truncate max-w-[200px]">— {ticket.parent_summary}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-slate-700 border border-slate-600 flex items-center justify-center text-[10px] font-bold text-slate-400 shrink-0 overflow-hidden">
+                            <User size={12} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm text-slate-300 truncate font-medium">{ticket.assignee}</div>
+                            <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                              <History size={10} />
+                              {ticket.resolved ? new Date(ticket.resolved).toLocaleDateString() : 'Unresolved'}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={currentValues.tpd_bu || ''}
+                            onChange={(e) => handleFieldChange(ticket.key, 'tpd_bu', e.target.value)}
+                            className="w-full px-2 py-1.5 bg-slate-900 border border-slate-600 rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all shadow-inner"
+                            placeholder="e.g. B2C"
+                            autoFocus
+                          />
+                        ) : (
+                          <div className={`text-sm ${ticket.tpd_bu ? 'text-slate-300' : 'text-rose-400/70 italic flex items-center gap-1.5'}`}>
+                            {!ticket.tpd_bu && <AlertCircle size={12} />}
+                            {ticket.tpd_bu || 'Unassigned BU'}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 align-top">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={currentValues.work_stream || ''}
+                            onChange={(e) => handleFieldChange(ticket.key, 'work_stream', e.target.value)}
+                            className="w-full px-2 py-1.5 bg-slate-900 border border-slate-600 rounded text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all shadow-inner"
+                            placeholder="e.g. Product"
+                          />
+                        ) : (
+                          <div className={`text-sm ${ticket.work_stream ? 'text-slate-300' : 'text-rose-400/70 italic flex items-center gap-1.5'}`}>
+                            {!ticket.work_stream && <AlertCircle size={12} />}
+                            {ticket.work_stream || 'Unassigned WS'}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 align-top text-center">
+                        <span className={`text-sm font-bold ${ticket.story_points ? 'text-slate-300' : 'text-slate-600'}`}>
+                          {ticket.story_points ?? '—'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 align-top text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {isEditing ? (
+                            <>
+                              <button
+                                onClick={() => handleSave(ticket.key)}
+                                disabled={isSaving}
+                                className="p-1.5 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white rounded-lg transition-all cursor-pointer shadow-sm"
+                                title="Save changes"
+                              >
+                                {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                              </button>
+                              <button
+                                onClick={() => cancelEdit(ticket.key)}
+                                className="p-1.5 bg-slate-700/50 text-slate-400 hover:bg-slate-700 hover:text-white rounded-lg transition-all cursor-pointer"
+                                title="Cancel"
+                              >
+                                <X size={14} />
+                              </button>
+                            </>
+                          ) : (
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                              <button
+                                onClick={() => setEditingKey(ticket.key)}
+                                className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-all cursor-pointer"
+                                title="Edit attribution"
+                              >
+                                <MoreHorizontal size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleCalcFields(ticket.key)}
+                                disabled={isCalculating}
+                                className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-all cursor-pointer"
+                                title="Run inference rules"
+                              >
+                                {isCalculating ? <Loader2 size={16} className="animate-spin" /> : <Calculator size={16} />}
+                              </button>
+                              <button
+                                onClick={() => handleSyncOne(ticket.key)}
+                                disabled={isCalculating}
+                                className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-all cursor-pointer"
+                                title="Re-sync from JIRA"
+                              >
+                                <RefreshCw size={16} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+        
+        <div className="bg-slate-800/80 border-t border-slate-700 px-6 py-3 flex items-center justify-between text-xs text-slate-500 font-medium">
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1.5">
+              <BarChart2 size={14} />
+              Showing {filteredTickets.length} of {tickets.length} tickets
+            </span>
+            {missingFilter && (
+              <span className="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1">
+                <Filter size={10} />
+                Filtering: {missingFilter.replace('_', ' ').toUpperCase()}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Info size={14} />
+            Only tickets in "Done" category are shown for attribution
+          </div>
         </div>
       </div>
     </div>

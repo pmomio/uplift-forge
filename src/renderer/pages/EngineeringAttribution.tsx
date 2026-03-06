@@ -7,7 +7,7 @@ import { getTickets, triggerSync, syncAllProjects } from '../api';
 import type { ProjectInfo } from '../App';
 import type { Persona } from '../../shared/types';
 
-export type MissingFilter = 'tpd_bu' | 'eng_hours' | 'work_stream' | null;
+export type MissingFilter = 'tpd_bu' | 'work_stream' | 'story_points' | null;
 
 interface EngineeringAttributionProps {
   refreshKey: number;
@@ -106,7 +106,7 @@ const EngineeringAttribution: React.FC<EngineeringAttributionProps> = ({ refresh
           </div>
         ) : (
           <>
-            <TicketTable tickets={tickets} onUpdate={fetchTickets} missingFilter={missingFilter} onClearFilter={() => setMissingFilter(null)} />
+            <TicketTable tickets={tickets} onRefresh={fetchTickets} activeFilter={missingFilter} loading={syncing} />
             <TicketSummary tickets={tickets} activeFilter={missingFilter} onFilterChange={setMissingFilter} />
           </>
         )}

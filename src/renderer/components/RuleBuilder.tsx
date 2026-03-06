@@ -18,8 +18,8 @@ interface RuleGroups {
 interface RuleBuilderProps {
   title: string;
   color: 'indigo' | 'emerald' | 'violet';
-  groups: RuleGroups;
-  onChange: (groups: RuleGroups) => void;
+  rules: RuleGroups;
+  onChange: (rules: RuleGroups) => void;
 }
 
 const FIELDS = [
@@ -84,7 +84,7 @@ const colorMap = {
 
 const newRule = (): Rule => ({ field: 'parent_key', operator: 'equals', value: '' });
 
-const RuleBuilder: React.FC<RuleBuilderProps> = ({ title, color, groups, onChange }) => {
+const RuleBuilder: React.FC<RuleBuilderProps> = ({ title, color, rules, onChange }) => {
   const c = colorMap[color];
 
   // Modal state
@@ -94,7 +94,7 @@ const RuleBuilder: React.FC<RuleBuilderProps> = ({ title, color, groups, onChang
   // --- mutations ---
 
   const updateRule = (group: string, blockIdx: number, ruleIdx: number, patch: Partial<Rule>) => {
-    const updated = { ...groups };
+    const updated = { ...rules };
     const blocks = updated[group].map(b => [...b]);
     blocks[blockIdx][ruleIdx] = { ...blocks[blockIdx][ruleIdx], ...patch };
     updated[group] = blocks;
@@ -102,7 +102,7 @@ const RuleBuilder: React.FC<RuleBuilderProps> = ({ title, color, groups, onChang
   };
 
   const removeRule = (group: string, blockIdx: number, ruleIdx: number) => {
-    const updated = { ...groups };
+    const updated = { ...rules };
     const blocks = updated[group].map(b => [...b]);
     blocks[blockIdx] = blocks[blockIdx].filter((_: Rule, i: number) => i !== ruleIdx);
     // If the block is now empty, remove the whole block
@@ -111,7 +111,7 @@ const RuleBuilder: React.FC<RuleBuilderProps> = ({ title, color, groups, onChang
   };
 
   const addAndCondition = (group: string, blockIdx: number) => {
-    const updated = { ...groups };
+    const updated = { ...rules };
     const blocks = updated[group].map(b => [...b]);
     blocks[blockIdx] = [...blocks[blockIdx], newRule()];
     updated[group] = blocks;
@@ -119,25 +119,25 @@ const RuleBuilder: React.FC<RuleBuilderProps> = ({ title, color, groups, onChang
   };
 
   const addOrBlock = (group: string) => {
-    const updated = { ...groups };
+    const updated = { ...rules };
     updated[group] = [...(updated[group] || []), [newRule()]];
     onChange(updated);
   };
 
   const handleAddGroup = (name: string) => {
-    onChange({ ...groups, [name]: [] });
+    onChange({ ...rules, [name]: [] });
     toast.success(`Group "${name}" added`);
   };
 
   const handleRemoveGroup = (group: string) => {
-    const updated = { ...groups };
+    const updated = { ...rules };
     delete updated[group];
     onChange(updated);
     toast.success(`Group "${group}" removed`);
   };
 
   const removeBlock = (group: string, blockIdx: number) => {
-    const updated = { ...groups };
+    const updated = { ...rules };
     updated[group] = updated[group].filter((_: Rule[], i: number) => i !== blockIdx);
     onChange(updated);
   };
@@ -148,12 +148,12 @@ const RuleBuilder: React.FC<RuleBuilderProps> = ({ title, color, groups, onChang
         {title}
       </h3>
 
-      {Object.keys(groups).length === 0 && (
+      {Object.keys(rules).length === 0 && (
         <p className="text-sm text-slate-500 italic py-2">No groups defined yet.</p>
       )}
 
       <div className="space-y-3">
-        {Object.entries(groups).map(([groupName, blocks]) => (
+        {Object.entries(rules).map(([groupName, blocks]) => (
           <div key={groupName} className={`${c.groupBg} border ${c.groupBorder} rounded-lg p-3`}>
             {/* Group header */}
             <div className="flex justify-between items-center mb-2">
@@ -162,7 +162,7 @@ const RuleBuilder: React.FC<RuleBuilderProps> = ({ title, color, groups, onChang
               </span>
               <button
                 onClick={() => setConfirmRemove(groupName)}
-                className="text-slate-500 hover:text-rose-400 p-0.5 rounded transition-colors"
+                className="text-slate-500 hover:text-rose-400 p-0.5 rounded transition-colors cursor-pointer"
                 title="Remove group"
               >
                 <X size={14} />
@@ -221,7 +221,7 @@ const RuleBuilder: React.FC<RuleBuilderProps> = ({ title, color, groups, onChang
                           />
                           <button
                             onClick={() => removeRule(groupName, blockIdx, ruleIdx)}
-                            className="text-slate-500 hover:text-rose-400 p-0.5 rounded transition-colors shrink-0"
+                            className="text-slate-500 hover:text-rose-400 p-0.5 rounded transition-colors shrink-0 cursor-pointer"
                           >
                             <X size={13} />
                           </button>
@@ -232,14 +232,14 @@ const RuleBuilder: React.FC<RuleBuilderProps> = ({ title, color, groups, onChang
                     <div className="mt-1.5 flex items-center gap-2">
                       <button
                         onClick={() => addAndCondition(groupName, blockIdx)}
-                        className={`inline-flex items-center gap-1 text-[11px] ${c.btn} px-2 py-0.5 rounded transition-colors`}
+                        className={`inline-flex items-center gap-1 text-[11px] ${c.btn} px-2 py-0.5 rounded transition-colors cursor-pointer`}
                       >
                         <Plus size={11} /> AND
                       </button>
                       {blocks.length > 1 && (
                         <button
                           onClick={() => removeBlock(groupName, blockIdx)}
-                          className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-rose-400 px-2 py-0.5 rounded transition-colors"
+                          className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-rose-400 px-2 py-0.5 rounded transition-colors cursor-pointer"
                         >
                           <X size={11} /> Remove block
                         </button>
@@ -253,7 +253,7 @@ const RuleBuilder: React.FC<RuleBuilderProps> = ({ title, color, groups, onChang
             {/* Add OR block button */}
             <button
               onClick={() => addOrBlock(groupName)}
-              className={`mt-2 inline-flex items-center gap-1 text-xs ${c.btn} px-2 py-0.5 rounded transition-colors`}
+              className={`mt-2 inline-flex items-center gap-1 text-xs ${c.btn} px-2 py-0.5 rounded transition-colors cursor-pointer`}
             >
               <Plus size={12} /> OR Block
             </button>
@@ -274,7 +274,7 @@ const RuleBuilder: React.FC<RuleBuilderProps> = ({ title, color, groups, onChang
 
       <button
         onClick={() => setShowAddGroup(true)}
-        className={`mt-3 w-full border border-dashed ${c.addGroup} rounded-lg py-1.5 text-xs font-medium transition-colors flex items-center justify-center gap-1`}
+        className={`mt-3 w-full border border-dashed ${c.addGroup} rounded-lg py-1.5 text-xs font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer`}
       >
         <Plus size={13} /> Add Group
       </button>
@@ -289,35 +289,47 @@ const RuleBuilder: React.FC<RuleBuilderProps> = ({ title, color, groups, onChang
 
       {/* Add Group modal */}
       <ModalDialog
-        open={showAddGroup}
+        isOpen={showAddGroup}
         onClose={() => setShowAddGroup(false)}
-        mode="prompt"
         title="Add Group"
-        message="Enter a name for the new group."
-        placeholder="e.g. B2C, Operational"
-        confirmLabel="Add"
-        onSubmit={handleAddGroup}
-        validate={(v) => {
-          if (!v) return 'Group name cannot be empty';
-          if (groups[v]) return `Group "${v}" already exists`;
-          return null;
-        }}
-      />
+        footer={
+          <div className="flex gap-2 w-full">
+            <button onClick={() => setShowAddGroup(false)} className="flex-1 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs cursor-pointer">Cancel</button>
+            <button id="add-group-submit" className="flex-1 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded text-xs font-bold cursor-pointer">Add</button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-slate-300">Enter a name for the new group.</p>
+          <input
+            id="add-group-input"
+            type="text"
+            className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-indigo-500"
+            placeholder="e.g. B2C, Operational"
+            autoFocus
+          />
+        </div>
+      </ModalDialog>
 
       {/* Remove Group confirm modal */}
       <ModalDialog
-        open={confirmRemove !== null}
+        isOpen={confirmRemove !== null}
         onClose={() => setConfirmRemove(null)}
-        mode="confirm"
         title="Remove Group"
-        message={`Remove "${confirmRemove}" and all its rules?`}
-        confirmLabel="Remove"
-        confirmColor="rose"
-        onConfirm={() => {
-          if (confirmRemove) handleRemoveGroup(confirmRemove);
-          setConfirmRemove(null);
-        }}
-      />
+        footer={
+          <div className="flex gap-2 w-full">
+            <button onClick={() => setConfirmRemove(null)} className="flex-1 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-xs cursor-pointer">Cancel</button>
+            <button 
+              onClick={() => { if (confirmRemove) handleRemoveGroup(confirmRemove); setConfirmRemove(null); }}
+              className="flex-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-500 rounded text-xs font-bold cursor-pointer"
+            >
+              Remove
+            </button>
+          </div>
+        }
+      >
+        <p className="text-sm text-slate-300">Remove "{confirmRemove}" and all its rules?</p>
+      </ModalDialog>
     </section>
   );
 };

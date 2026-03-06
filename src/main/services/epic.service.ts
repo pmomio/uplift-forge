@@ -1,141 +1,138 @@
+import { getConfig } from './config.service.js';
 import { getAllTickets, FINAL_STATUSES } from './ticket.service.js';
-import type { ProcessedTicket, EpicSummary } from '../../shared/types.js';
-
-const BUG_TYPES = new Set(['bug', 'defect']);
-const BLOCKED_STATUSES = new Set(['blocked']);
+import { getTimelines } from './timeline.service.js';
+import type { EpicSummary, ProcessedTicket, TicketTimeline } from '../../shared/types.js';
 
 /**
- * Group tickets by parent_key and compute epic summaries with risk scores.
+ * Epic Aggregation Service — groups tickets by parent epic and computes risk.
  */
+
 export function getEpicSummaries(projectKey?: string): EpicSummary[] {
   const allTickets = getAllTickets(projectKey);
+  const timelines = getTimelines(projectKey);
+  const timelineMap = new Map(timelines.map(tl => [tl.key, tl]));
 
-  // Group by parent key
-  const epicMap = new Map<string, { summary: string; tickets: ProcessedTicket[] }>();
-
-  for (const ticket of allTickets) {
-    if (!ticket.parent_key) continue;
-    if (!epicMap.has(ticket.parent_key)) {
-      epicMap.set(ticket.parent_key, {
-        summary: ticket.parent_summary || ticket.parent_key,
-        tickets: [],
-      });
+  // 1. Group tickets by parent_key
+  const epicsMap = new Map<string, ProcessedTicket[]>();
+  for (const t of allTickets) {
+    if (t.parent_key) {
+      const children = epicsMap.get(t.parent_key) ?? [];
+      children.push(t);
+      epicsMap.set(t.parent_key, children);
     }
-    epicMap.get(ticket.parent_key)!.tickets.push(ticket);
   }
 
+  // 2. Build summaries
   const summaries: EpicSummary[] = [];
+  for (const [epicKey, children] of epicsMap.entries()) {
+    const epicTicket = allTickets.find(t => t.key === epicKey);
+    const summary = epicTicket?.summary ?? children[0].parent_summary ?? epicKey;
 
-  for (const [key, { summary, tickets }] of epicMap) {
-    if (tickets.length === 0) continue;
+    const totalTickets = children.length;
+    const resolved = children.filter(t => FINAL_STATUSES.includes(t.status));
+    const resolvedTickets = resolved.length;
 
-    const resolved = tickets.filter(t => FINAL_STATUSES.includes(t.status));
-    const totalSP = tickets.reduce((s, t) => s + (t.story_points ?? 0), 0);
+    const totalSP = children.reduce((s, t) => s + (t.story_points ?? 0), 0);
     const resolvedSP = resolved.reduce((s, t) => s + (t.story_points ?? 0), 0);
-    const progressPct = tickets.length > 0 ? Math.round((resolved.length / tickets.length) * 100) / 100 : 0;
 
-    // Avg cycle time across resolved tickets with hours
-    const ticketsWithHours = resolved.filter(t => t.eng_hours);
-    const avgCycleTime = ticketsWithHours.length > 0
-      ? Math.round((ticketsWithHours.reduce((s, t) => s + t.eng_hours!, 0) / ticketsWithHours.length) * 10) / 10
+    const progressPct = totalTickets > 0 ? (resolvedTickets / totalTickets) : 0;
+
+    // Avg cycle time for this epic's resolved tickets
+    const resolvedTimelines = resolved.map(t => timelineMap.get(t.key)).filter((tl): tl is TicketTimeline => !!tl && tl.cycleTimeHours != null);
+    const avgCycleTime = resolvedTimelines.length > 0
+      ? Math.round((resolvedTimelines.reduce((s, tl) => s + tl.cycleTimeHours!, 0) / resolvedTimelines.length) * 10) / 10
       : null;
 
-    // Risk score computation
-    const { riskScore, riskFactors } = computeRisk(tickets, resolved, avgCycleTime, progressPct);
-    const riskLevel = riskScore <= 0.3 ? 'low' : riskScore <= 0.6 ? 'medium' : 'high';
+    // 3. Risk Scoring
+    const { score, factors } = computeRiskScore(children, timelineMap, progressPct, avgCycleTime);
 
     summaries.push({
-      key,
+      key: epicKey,
       summary,
-      totalTickets: tickets.length,
-      resolvedTickets: resolved.length,
-      totalSP: Math.round(totalSP * 10) / 10,
-      resolvedSP: Math.round(resolvedSP * 10) / 10,
+      totalTickets,
+      resolvedTickets,
+      totalSP,
+      resolvedSP,
       progressPct,
       avgCycleTime,
-      riskScore: Math.round(riskScore * 100) / 100,
-      riskLevel,
-      riskFactors,
-      childTickets: tickets,
+      riskScore: score,
+      riskLevel: score < 0.3 ? 'low' : score < 0.6 ? 'medium' : 'high',
+      riskFactors: factors,
+      childTickets: children,
     });
   }
 
-  // Sort by risk score descending (highest risk first)
-  summaries.sort((a, b) => b.riskScore - a.riskScore);
-  return summaries;
+  return summaries.sort((a, b) => b.riskScore - a.riskScore);
 }
 
-/**
- * Get detailed epic information for a specific epic key.
- */
 export function getEpicDetail(epicKey: string, projectKey?: string): EpicSummary | null {
-  const all = getEpicSummaries(projectKey);
-  return all.find(e => e.key === epicKey) ?? null;
+  const summaries = getEpicSummaries(projectKey);
+  return summaries.find(s => s.key === epicKey) ?? null;
 }
 
 /**
- * Compute risk score and human-readable risk factors.
- *
- * riskScore = weighted sum of:
- *   - (1 - progressPct) * 0.3     // low progress = higher risk
- *   - overdueRatio * 0.3          // tickets past average cycle time
- *   - blockedRatio * 0.2          // tickets currently blocked
- *   - bugRatio * 0.1              // bugs in the epic
- *   - reopenRatio * 0.1           // tickets that cycled back (approximated by non-final status after being resolved)
+ * Weighted risk scoring formula (0.0 to 1.0).
  */
-function computeRisk(
-  allTickets: ProcessedTicket[],
-  resolved: ProcessedTicket[],
-  avgCycleTime: number | null,
-  progressPct: number,
-): { riskScore: number; riskFactors: string[] } {
+function computeRiskScore(
+  allTickets: ProcessedTicket[], 
+  timelineMap: Map<string, TicketTimeline>,
+  progressPct: number, 
+  avgCycleTime: number | null
+): { score: number; factors: string[] } {
   const factors: string[] = [];
-  const total = allTickets.length;
-  if (total === 0) return { riskScore: 0, riskFactors: [] };
+  let score = 0;
 
-  // 1. Progress factor
-  const progressFactor = (1 - progressPct) * 0.3;
-  if (progressPct < 0.5) {
-    const inProgress = total - resolved.length;
-    factors.push(`Only ${Math.round(progressPct * 100)}% complete with ${inProgress} of ${total} tickets still open`);
+  // 1. Low progress factor (30%)
+  if (progressPct < 0.2) {
+    score += 0.3;
+    factors.push('Low completion rate (< 20%)');
+  } else if (progressPct < 0.5) {
+    score += 0.15;
+    factors.push('Partial completion (< 50%)');
   }
 
-  // 2. Overdue factor — tickets with eng_hours > 2x avg cycle time
-  let overdueFactor = 0;
+  // 2. Overdue factor — tickets with active time > 2x avg cycle time (30%)
   if (avgCycleTime && avgCycleTime > 0) {
-    const overdue = allTickets.filter(t => t.eng_hours != null && t.eng_hours > avgCycleTime * 2 && !FINAL_STATUSES.includes(t.status));
-    const overdueRatio = overdue.length / total;
-    overdueFactor = overdueRatio * 0.3;
+    const overdue = allTickets.filter(t => {
+      if (FINAL_STATUSES.includes(t.status)) return false;
+      const tl = timelineMap.get(t.key);
+      return tl && tl.activeTimeHours > avgCycleTime * 2;
+    });
     if (overdue.length > 0) {
-      factors.push(`${overdue.length} ticket${overdue.length > 1 ? 's have' : ' has'} exceeded 2x the average cycle time`);
+      const ratio = overdue.length / allTickets.length;
+      score += Math.min(0.3, ratio * 0.6);
+      factors.push(`${overdue.length} tickets trending past expected cycle time`);
     }
   }
 
-  // 3. Blocked factor
-  const blocked = allTickets.filter(t => BLOCKED_STATUSES.has(t.status.toLowerCase()));
-  const blockedRatio = blocked.length / total;
-  const blockedFactor = blockedRatio * 0.2;
+  // 3. Blocked factor (20%)
+  const blockedStatuses = getConfig().blocked_statuses.map(s => s.toLowerCase());
+  const blocked = allTickets.filter(t => blockedStatuses.includes(t.status.toLowerCase()));
   if (blocked.length > 0) {
-    factors.push(`${blocked.length} ticket${blocked.length > 1 ? 's are' : ' is'} currently blocked`);
+    const ratio = blocked.length / allTickets.length;
+    score += Math.min(0.2, ratio * 0.5);
+    factors.push(`${blocked.length} tickets currently blocked`);
   }
 
-  // 4. Bug factor
-  const bugs = allTickets.filter(t => BUG_TYPES.has((t.issue_type ?? '').toLowerCase()));
-  const bugRatio = bugs.length / total;
-  const bugFactor = bugRatio * 0.1;
-  if (bugRatio > 0.2) {
-    factors.push(`Bug ratio (${Math.round(bugRatio * 100)}%) is above healthy threshold`);
+  // 4. Bug ratio factor (10%)
+  const bugs = allTickets.filter(t => t.issue_type.toLowerCase().includes('bug'));
+  if (bugs.length > 0) {
+    const ratio = bugs.length / allTickets.length;
+    if (ratio > 0.3) {
+      score += 0.1;
+      factors.push('High bug-to-feature ratio');
+    }
   }
 
-  // 5. Reopen factor (approximated: tickets that have been resolved but are back to non-final)
-  // We can detect this by checking tickets with resolved date but not in final status
-  const reopened = allTickets.filter(t => t.resolved && !FINAL_STATUSES.includes(t.status));
-  const reopenRatio = reopened.length / total;
-  const reopenFactor = reopenRatio * 0.1;
-  if (reopened.length > 0) {
-    factors.push(`${reopened.length} ticket${reopened.length > 1 ? 's have' : ' has'} been reopened after resolution`);
+  // 5. Rework factor (10%)
+  const withRework = allTickets.filter(t => timelineMap.get(t.key)?.hasRework);
+  if (withRework.length > 0) {
+    const ratio = withRework.length / allTickets.length;
+    if (ratio > 0.2) {
+      score += 0.1;
+      factors.push('Frequent rework detected in workflow');
+    }
   }
 
-  const riskScore = Math.min(1, progressFactor + overdueFactor + blockedFactor + bugFactor + reopenFactor);
-  return { riskScore, riskFactors: factors };
+  return { score: Math.min(1.0, score), factors };
 }

@@ -14,9 +14,6 @@ export interface ProjectConfig {
   project_name?: string;
   field_ids: FieldIds;
   mapping_rules: MappingRules;
-  eng_start_status: string;
-  eng_end_status: string;
-  eng_excluded_statuses?: string[];
   ticket_filter?: TicketFilter;
 }
 
@@ -52,16 +49,8 @@ export interface MappingRules {
 
 export interface FieldIds {
   tpd_bu: string;
-  eng_hours: string;
   work_stream: string;
   story_points?: string;
-}
-
-export interface OfficeHoursConfig {
-  start: string;       // "09:00"
-  end: string;         // "18:00"
-  timezone: string;    // "Europe/Berlin"
-  exclude_weekends: boolean;
 }
 
 export interface TicketFilter {
@@ -89,12 +78,8 @@ export interface AgingThresholds {
 
 export interface AppConfig {
   project_key: string;
-  office_hours: OfficeHoursConfig;
   field_ids: FieldIds;
   mapping_rules: MappingRules;
-  eng_start_status: string;
-  eng_end_status: string;
-  eng_excluded_statuses: string[];
   ticket_filter: TicketFilter;
   sp_to_days: number;
   tracked_engineers: TrackedEngineer[];
@@ -118,7 +103,6 @@ export interface ProcessedTicket {
   summary: string;
   status: string;
   assignee: string;
-  eng_hours: number | null;
   tpd_bu: string | null;
   work_stream: string | null;
   has_computed_values: boolean;
@@ -164,26 +148,21 @@ export interface TicketTimeline {
 export interface MetricsSummary {
   total_tickets: number;
   total_story_points: number;
-  total_eng_hours: number;
   estimation_accuracy: number | null;
-  avg_eng_hours_per_sp: number | null;
   avg_cycle_time_hours: number | null;
   bug_count: number;
   bug_ratio: number;
-  bug_eng_hours_pct: number;
 }
 
 export interface BreakdownEntry {
   tickets: number;
   story_points: number;
-  eng_hours: number;
 }
 
 export interface MonthlyTrendEntry {
   month: string;
   tickets: number;
   story_points: number;
-  eng_hours: number;
   bug_count: number;
 }
 
@@ -203,9 +182,7 @@ export interface TeamMetricsResponse {
 export interface IndividualSummary {
   total_tickets: number;
   total_story_points: number;
-  total_eng_hours: number;
   avg_cycle_time_hours: number | null;
-  avg_eng_hours_per_sp: number | null;
   estimation_accuracy: number | null;
   bug_ratio: number;
   complexity_score: number | null;

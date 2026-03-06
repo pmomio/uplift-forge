@@ -151,7 +151,7 @@ npm run publish        # 🚀 Publish to GitHub Releases
 
 ### 🕐 Timeline Engine
 
-Separate from engineering hours (office-hours-based), the Timeline Engine in `timeline.service.ts` extracts richer flow data from JIRA changelogs using **calendar time**:
+Separate from legacy manual field mapping, the Timeline Engine in `timeline.service.ts` extracts richer flow data from JIRA changelogs using **calendar time**:
 
 - 📊 **Status Periods** — every period a ticket spent in each status, with duration and category
 - ⏱️ **Cycle Time** — first active status to done (calendar hours)
@@ -162,24 +162,14 @@ Separate from engineering hours (office-hours-based), the Timeline Engine in `ti
 
 Status classification is configurable: Active Statuses, Blocked Statuses, Done Statuses.
 
-### ⏱️ Engineering Hours Calculation
+### 🧮 Field Engine
 
-State machine in `field-engine.service.ts:calculateEngineeringHours()`:
-
-- **States**: `idle` → `active` → `blocked` → `active` → `idle`
-- 🔄 Tracks ALL active development periods across multiple start→end cycles
-- 🔁 Tickets can bounce between statuses (rework, multiple developers) — total hours accumulate
-- ⏸️ Excluded statuses (e.g. "Blocked") pause the clock
-- 🌍 Office hours: timezone-aware, weekday-only, configurable start/end times
-- ⚠️ **Known pitfall**: JIRA's `toString` changelog property collides with `Object.prototype.toString`. Must use bracket notation + typeof check (see `getStatusTo()` helper)
-- ✅ **No matching statuses → 0 hours**: If a ticket never enters the configured start/end statuses (e.g. Todo → Rejected), returns `0` instead of `null`. Only non-array input returns `null`.
+The `field-engine.service.ts` provides rule-based automation for field mapping:
+- 🗺️ **Rule-based mapping** — automatically determines TPD BU and Work Stream based on ticket attributes (Labels, Components, parent Epic, etc.)
+- 🔄 **Inference Engine** — can be run on-demand to fill missing attribution fields.
 
 ### ⚙️ Config Defaults
 
-- `eng_start_status`: "In Progress"
-- `eng_end_status`: "In Review"
-- `eng_excluded_statuses`: ["Blocked"]
-- `office_hours`: 09:00–18:00 Europe/Berlin, weekends excluded
 - `sp_to_days`: 1 (story point = 1 day = 8 hours for estimation accuracy)
 - `active_statuses`: ["In Progress", "Code Review", "QA"]
 - `blocked_statuses`: ["Blocked"]
@@ -195,7 +185,7 @@ State machine in `field-engine.service.ts:calculateEngineeringHours()`:
 - Aging WIP (warning/critical/escalation tiers)
 - Bug ratio by engineer
 - Rework rate
-- 🎯 SP estimation accuracy (actual eng hours vs estimated SP × sp_to_days × 8h)
+- 🎯 SP estimation accuracy (active time from history vs estimated SP × sp_to_days × 8h)
 - ✅ First-time pass rate (complement of rework rate)
 - ⏱️ Avg code review duration (time in review statuses)
 - 📊 Work type distribution (horizontal bar by issue type)

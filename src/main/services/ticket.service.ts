@@ -1,7 +1,6 @@
 import Store from 'electron-store';
 import { getConfig } from './config.service.js';
-import { calculateEngineeringHours, getMappedFields } from './field-engine.service.js';
-import type { EngHoursConfig } from './field-engine.service.js';
+import { getMappedFields } from './field-engine.service.js';
 import * as jira from './jira.service.js';
 import { getBaseUrl } from '../auth/token-store.js';
 import { invalidateTimelineCache } from './timeline.service.js';
@@ -128,10 +127,6 @@ loadPersistedCaches();
 function resolveProjectConfig(projectKey: string): {
   field_ids: AppConfig['field_ids'];
   mapping_rules: AppConfig['mapping_rules'];
-  eng_start_status: string;
-  eng_end_status: string;
-  eng_excluded_statuses: string[];
-  office_hours: AppConfig['office_hours'];
   ticket_filter: AppConfig['ticket_filter'];
   sp_to_days: number;
 } {
@@ -141,10 +136,6 @@ function resolveProjectConfig(projectKey: string): {
     return {
       field_ids: cfg.field_ids,
       mapping_rules: cfg.mapping_rules,
-      eng_start_status: cfg.eng_start_status,
-      eng_end_status: cfg.eng_end_status,
-      eng_excluded_statuses: cfg.eng_excluded_statuses,
-      office_hours: cfg.office_hours,
       ticket_filter: cfg.ticket_filter,
       sp_to_days: cfg.sp_to_days,
     };
@@ -156,10 +147,6 @@ function resolveProjectConfig(projectKey: string): {
     return {
       field_ids: additional.field_ids,
       mapping_rules: additional.mapping_rules,
-      eng_start_status: additional.eng_start_status,
-      eng_end_status: additional.eng_end_status,
-      eng_excluded_statuses: additional.eng_excluded_statuses ?? cfg.eng_excluded_statuses,
-      office_hours: cfg.office_hours,
       ticket_filter: additional.ticket_filter ?? cfg.ticket_filter,
       sp_to_days: cfg.sp_to_days,
     };
@@ -169,10 +156,6 @@ function resolveProjectConfig(projectKey: string): {
   return {
     field_ids: cfg.field_ids,
     mapping_rules: cfg.mapping_rules,
-    eng_start_status: cfg.eng_start_status,
-    eng_end_status: cfg.eng_end_status,
-    eng_excluded_statuses: cfg.eng_excluded_statuses,
-    office_hours: cfg.office_hours,
     ticket_filter: cfg.ticket_filter,
     sp_to_days: cfg.sp_to_days,
   };
@@ -211,7 +194,6 @@ export function processIssue(
 
     // JIRA custom field values
     const tpdBuField = cfg.field_ids.tpd_bu;
-    const engHoursField = cfg.field_ids.eng_hours;
     const workStreamField = cfg.field_ids.work_stream;
 
     let jiraTpdBu: string | null = null;
@@ -224,12 +206,6 @@ export function processIssue(
       }
     }
 
-    let jiraEngHours: number | null = null;
-    if (engHoursField) {
-      const raw = fields[engHoursField];
-      if (raw != null) jiraEngHours = Number(raw);
-    }
-
     let jiraWorkStream: string | null = null;
     if (workStreamField) {
       const raw = fields[workStreamField] as unknown;
@@ -240,22 +216,9 @@ export function processIssue(
       }
     }
 
-    // Compute values from changelog/rules using project-specific config
-    const changelog = (issue.changelog ?? {}) as { histories?: unknown[] };
-    const histories = (changelog.histories ?? []) as Array<{
-      created: string;
-      items: Array<{ field: string; toString?: string; fromString?: string }>;
-    }>;
-    const engHoursOverrides: EngHoursConfig = {
-      eng_start_status: cfg.eng_start_status,
-      eng_end_status: cfg.eng_end_status,
-      eng_excluded_statuses: cfg.eng_excluded_statuses,
-      office_hours: cfg.office_hours,
-    };
-    const compEngHours = calculateEngineeringHours(histories, engHoursOverrides);
+    // Compute values from rules using project-specific config
     const [compTpdBu, compWorkStream] = getMappedFields(issue, cfg.mapping_rules);
 
-    const usesComputedEngHours = jiraEngHours == null && compEngHours != null;
     const usesComputedTpdBu = !jiraTpdBu && !!compTpdBu;
     const usesComputedWorkStream = !jiraWorkStream && !!compWorkStream;
 
@@ -324,10 +287,9 @@ export function processIssue(
       summary,
       status,
       assignee,
-      eng_hours: jiraEngHours ?? compEngHours,
       tpd_bu: jiraTpdBu ?? compTpdBu,
       work_stream: jiraWorkStream ?? compWorkStream,
-      has_computed_values: usesComputedEngHours || usesComputedTpdBu || usesComputedWorkStream,
+      has_computed_values: usesComputedTpdBu || usesComputedWorkStream,
       story_points: storyPoints,
       issue_type: issueType,
       priority,
@@ -405,7 +367,7 @@ export async function syncTickets(projectKey?: string): Promise<number> {
     return issues.length;
   } catch (e) {
     console.error(`[Tickets] Sync failed for "${targetKey}":`, e);
-    return 0;
+    throw e;
   }
 }
 
@@ -450,74 +412,6 @@ export async function syncSingleTicket(key: string): Promise<ProcessedTicket | n
 }
 
 /**
- * Calculate engineering hours for a single ticket from changelog.
- * Returns hours + diagnostics so the UI can explain why calculation failed.
- */
-export async function calculateTicketHours(key: string): Promise<{
-  hours: number | null;
-  diagnostics?: {
-    configuredStart: string;
-    configuredEnd: string;
-    statusTransitions: Array<{ from: string; to: string; created: string }>;
-    rawFirstItem?: Record<string, unknown>;
-  };
-}> {
-  // Infer project from ticket key
-  const projectKey = key.split('-')[0];
-  const cfg = resolveProjectConfig(projectKey);
-  const changelog = await jira.getIssueChangelog(key);
-  const histories = (changelog.histories ?? []) as Array<{
-    created: string;
-    items: Array<{ field: string; toString?: string; fromString?: string }>;
-  }>;
-
-  // Collect all status transitions for diagnostics
-  const statusTransitions: Array<{ from: string; to: string; created: string }> = [];
-  let rawFirstItem: Record<string, unknown> | undefined;
-  for (const history of histories) {
-    for (const item of history.items) {
-      if (item.field === 'status') {
-        const raw = item as Record<string, unknown>;
-        if (!rawFirstItem) {
-          rawFirstItem = { ...raw };
-          console.log(`[Tickets] Raw changelog item keys for ${key}:`, Object.keys(raw));
-          console.log(`[Tickets] Raw changelog item for ${key}:`, JSON.stringify(raw));
-        }
-        // Use bracket notation to safely read own properties
-        // (avoids collision with Object.prototype.toString)
-        statusTransitions.push({
-          from: String(raw['fromString'] ?? ''),
-          to: String(raw['toString'] ?? ''),
-          created: history.created,
-        });
-      }
-    }
-  }
-
-  const engHoursOverrides: EngHoursConfig = {
-    eng_start_status: cfg.eng_start_status,
-    eng_end_status: cfg.eng_end_status,
-    eng_excluded_statuses: cfg.eng_excluded_statuses,
-    office_hours: cfg.office_hours,
-  };
-  const hours = calculateEngineeringHours(histories, engHoursOverrides);
-
-  if (hours === null) {
-    console.log(`[Tickets] Hours calc failed for ${key}. Config: start="${cfg.eng_start_status}", end="${cfg.eng_end_status}". Transitions:`, statusTransitions);
-  }
-
-  return {
-    hours,
-    diagnostics: {
-      configuredStart: cfg.eng_start_status,
-      configuredEnd: cfg.eng_end_status,
-      statusTransitions,
-      rawFirstItem,
-    },
-  };
-}
-
-/**
  * Calculate mapped fields for a single ticket.
  */
 export async function calculateTicketFields(key: string): Promise<{ tpd_bu: string | null; work_stream: string | null }> {
@@ -552,7 +446,7 @@ export function getTickets(projectKey?: string): ProcessedTicket[] {
   let filtered = allTickets.filter((t) => FINAL_STATUSES.includes(t.status));
 
   if (cfg.ticket_filter.mode === 'missing_fields') {
-    filtered = filtered.filter((t) => !t.tpd_bu || t.eng_hours == null || !t.work_stream);
+    filtered = filtered.filter((t) => !t.tpd_bu || !t.work_stream);
   }
 
   return filtered.sort((a, b) => (b.updated ?? '').localeCompare(a.updated ?? ''));
@@ -574,12 +468,6 @@ export async function updateTicket(
     const fieldId = cfg.field_ids.tpd_bu;
     if (fieldId) {
       jiraPayload[fieldId] = fields.tpd_bu ? [{ value: fields.tpd_bu }] : [];
-    }
-  }
-  if ('eng_hours' in fields) {
-    const fieldId = cfg.field_ids.eng_hours;
-    if (fieldId) {
-      jiraPayload[fieldId] = fields.eng_hours != null ? Number(fields.eng_hours) : null;
     }
   }
   if ('work_stream' in fields) {

@@ -41,7 +41,7 @@ const TOOLTIPS = {
     target: 'Green metrics = better than team avg. Focus on improving red metrics through coaching.',
     trendUp: 'Metric rising vs team avg — green if the metric benefits from increase, red otherwise',
     trendDown: 'Metric falling vs team avg — green if lower is better (cycle time, rework), red otherwise',
-    derivation: 'Data source: JIRA changelogs + ticket fields per engineer.\nComputation: Each engineer card shows cycle time p50/p85 (timeline engine), rework rate (backward transitions), bug ratio (bug tickets ÷ total), SP accuracy (eng hours ÷ estimated), first-time pass rate (1 − rework), complexity score (avg SP/ticket), and focus ratio (product tickets ÷ total). Color-coded vs team average: green = better, red = worse.\nFilters: Period and project filters. Only tracked engineers.\nConfig dependency: tracked_engineers, active_statuses, done_statuses, sp_to_days.',
+    derivation: 'Data source: JIRA changelogs + ticket fields per engineer.\nComputation: Each engineer card shows cycle time p50/p85 (timeline engine), rework rate (backward transitions), bug ratio (bug tickets ÷ total), SP accuracy (active time ÷ estimated), first-time pass rate (1 − rework), complexity score (avg SP/ticket), and focus ratio (product tickets ÷ total). Color-coded vs team average: green = better, red = worse.\nFilters: Period and project filters. Only tracked engineers.\nConfig dependency: tracked_engineers, active_statuses, done_statuses, sp_to_days.',
   },
 };
 

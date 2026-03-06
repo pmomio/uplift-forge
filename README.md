@@ -20,7 +20,7 @@ You connect to JIRA. Uplift Forge pulls your tickets, crunches the numbers, and 
 
 - 🎭 **4 Persona-Specific Dashboards** — completely different metrics for Engineering Managers, Delivery Managers, Individual Contributors, and Members of Management
 - 🌐 **Cross-Project Aggregation** — EM and Management personas track multiple JIRA projects simultaneously with aggregated metrics, epics, and attribution
-- ⏱️ **Timeline Engine** — extracts status periods, cycle/lead time, rework detection, and flow efficiency from JIRA changelogs
+- ⏱️ **Timeline Engine** — extracts status periods, cycle/lead time, rework detection, and flow efficiency from JIRA changelogs (calendar-time based)
 - 📊 **EM Dashboard** — cycle time distribution, throughput, contribution spread, aging WIP, bug ratio, rework rate, SP accuracy, first-time pass rate, review duration, work type distribution, lead time breakdown
 - 🌊 **DM Flow Dashboard** — CFD, lead time histogram, WIP vs limit, tiered aging WIP, blockers, flow efficiency, Monte Carlo forecast, arrival vs departure, batch size trend, time to first activity, lead time breakdown
 - 🧑‍💻 **IC Personal Dashboard** — private cycle time trend, throughput, time-in-status, rework, scope trajectory, team comparison (opt-in), personal goals, SP accuracy, first-time pass rate, review wait time, focus score
@@ -29,7 +29,7 @@ You connect to JIRA. Uplift Forge pulls your tickets, crunches the numbers, and 
 - 🧠 **Smart Attribution** — rule-based classification of tickets into business units and work streams
 - ✏️ **JIRA Write-back** — edit fields inline and push them straight back to JIRA
 - 🤖 **AI Suggestions** — connect OpenAI or Claude to get persona-aware actionable improvement suggestions
-- 📖 **Explain Button** — every metric has a BookOpen icon that opens a modal explaining the data source, computation formula, filters, and config dependencies. Shows **dynamic computation traces** with real values (ticket counts, filter results, intermediate calculations) when available, falling back to static descriptions
+- 📖 **Explain Button** — every metric has a BookOpen icon that opens a modal explaining the data source, computation formula, filters, and config dependencies. Shows **dynamic computation traces** with real values (ticket counts, filter results, intermediate calculations) when available
 
 All data stays on your machine. 🏠 Your credentials live in your OS keychain. 🔐 Nothing leaves your laptop (except JIRA API calls and optional AI provider calls).
 
@@ -71,9 +71,8 @@ Head to **Settings** and:
 
 1. 🏷️ Set your **JIRA Project Key** (e.g. `ACTIN`)
 2. 📥 Click **Fetch Fields** to load your custom fields and statuses
-3. 🗺️ Map your JIRA custom fields (TPD BU, Engineering Hours, Work Stream, Story Points)
-4. ⏱️ Set the **start** and **end** statuses for engineering hours calculation (e.g. "In Progress" -> "Code Review")
-5. 📏 Optionally set up mapping rules for auto-classification
+3. 🗺️ Map your JIRA custom fields (TPD BU, Work Stream, Story Points)
+4. 📏 Optionally set up mapping rules for auto-classification
 
 Hit save, and you're off to the races! 🏁
 
@@ -108,7 +107,6 @@ A persona-aware welcome screen with a getting-started guide. Shows different gre
 
 The workhorse 💪. A sortable, filterable table of all your resolved tickets.
 
-- ⏱️ **Engineering Hours**: Auto-computed from status changelogs using an office-hours state machine
 - 🏢 **TPD BU & Work Stream**: Auto-classify using mapping rules, or edit inline
 - 💾 **Save to JIRA**: Push changes back with one click
 
@@ -123,7 +121,7 @@ The workhorse 💪. A sortable, filterable table of all your resolved tickets.
 - ⏳ **Aging WIP** — tickets stuck in active statuses beyond warning/critical/escalation thresholds
 - 🐛 **Bug Ratio by Engineer** — quality signal per team member
 - 🔁 **Rework Rate** — percentage of tickets with backward status transitions
-- 🎯 **SP Estimation Accuracy** — actual eng hours vs estimated (SP × sp_to_days × 8h)
+- 🎯 **SP Estimation Accuracy** — active time from history vs estimated (SP × sp_to_days × 8h)
 - ✅ **First-Time Pass Rate** — percentage of tickets completed without rework
 - ⏱️ **Avg Code Review Duration** — time tickets spend in review statuses
 - 📊 **Work Type Distribution** — horizontal bar chart by issue type
@@ -168,7 +166,7 @@ The workhorse 💪. A sortable, filterable table of all your resolved tickets.
 - ⏳ **My Aging WIP** — your in-progress tickets with days-in-status
 - 👥 **Team Comparison** (opt-in) — anonymous team medians for benchmarking
 - 🎯 **Goal Progress** — personal targets vs current performance
-- 🎯 **SP Estimation Accuracy** — your estimates vs actual engineering hours
+- 🎯 **SP Estimation Accuracy** — your estimates vs actual active time from history
 - ✅ **First-Time Pass Rate** — percentage of your tickets completed without rework
 - ⏱️ **Code Review Wait Time** — average time your tickets spend in review
 - 🎯 **Focus Score** — percentage of product work vs bugs/maintenance
@@ -194,45 +192,22 @@ Track epic-level delivery progress 📋. Available for Engineering Managers and 
 
 - 📊 **Summary stats** — total epics, high/medium/low risk counts
 - 🃏 **Epic cards** — expandable with progress bars, risk badges, ticket counts
-- ⚠️ **Auto-computed risk scores** — weighted formula based on progress, overdue, blocked, bugs, reopened
+- ⚠️ **Auto-computed risk scores** — weighted formula based on progress, overdue, blocked, bugs
 - 🤖 **AI Risk Analysis** — per-epic AI suggestions for risk mitigation
 
 ### 🔧 Settings
 
 - 🔒 **Your Role** — read-only badge (set during onboarding, immutable)
 - 🔗 **JIRA Connection** — project key, data range, field mappings
-- 📊 **Metrics** — SP calibration, tracked engineers
+- 📊 **Metrics** — SP calibration, tracked engineers, status classification
 - 📏 **Attribution** — visual rule builder for TPD BU and Work Stream
 - 🖥️ **Application** — AI provider setup, version info, update check
 
 ---
 
-## ⏱️ How Engineering Hours Work
-
-This is the core of the app, so here's how it works under the hood: 🧠
-
-```
-Ticket lifecycle:  ToDo -> In Progress -> Blocked -> In Progress -> Code Review -> In Progress -> Code Review -> Done
-                           |______________|         |_______________|            |_______________|
-                             Period 1                   Period 2                     Period 3
-
-Engineering Hours = office_hours(Period 1) + office_hours(Period 2) + office_hours(Period 3)
-```
-
-A state machine walks through every status transition in the changelog:
-
-- ▶️ **idle** -> Ticket enters the start status -> **active** (clock starts)
-- ⏸️ **active** -> Ticket enters an excluded status -> **blocked** (clock pauses)
-- ▶️ **blocked** -> Ticket leaves excluded status -> **active** (clock resumes)
-- ⏹️ **active** -> Ticket enters the end status -> **idle** (clock stops, period recorded)
-
-This repeats for every cycle. All periods are summed. Office hours are computed timezone-aware (default: 09:00-18:00 Europe/Berlin, weekdays only). 🌍
-
----
-
 ## 🔧 Timeline Engine
 
-Separate from engineering hours, the **Timeline Engine** extracts richer flow data from JIRA changelogs using **calendar time** (not office hours):
+The **Timeline Engine** extracts flow data from JIRA changelogs using **calendar time**:
 
 - 📊 **Status Periods** — every period a ticket spent in each status, with duration and category (active/wait/blocked/done)
 - ⏱️ **Cycle Time** — first active status to done (calendar hours)

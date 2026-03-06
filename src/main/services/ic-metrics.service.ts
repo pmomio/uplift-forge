@@ -1,131 +1,89 @@
 import { getConfig } from './config.service.js';
-import { getAllTickets } from './ticket.service.js';
-import {
-  getTimelines, computePercentiles,
-  computeSpAccuracy, computeReviewDuration,
-} from './timeline.service.js';
-import type {
-  IcPersonalMetricsResponse,
-  IcWeeklyTrend,
-  IcTimeInStatus,
-  IcAgingItem,
-  IcTeamComparison,
-  ProcessedTicket,
-  TicketTimeline,
-} from '../../shared/types.js';
+import { getTickets } from './ticket.service.js';
+import { getTimelines, computeSpAccuracy, computePercentiles } from './timeline.service.js';
+import type { IcPersonalMetricsResponse, ProcessedTicket, TicketTimeline, IcWeeklyTrend, IcTimeInStatus, IcAgingItem, IcTeamComparison } from '../../shared/types.js';
 
 /**
- * IC Personal Metrics — private to the individual contributor.
- * All data is filtered to config.my_account_id.
+ * IC Persona Metrics — private personal metrics for the logged-in user.
  */
-export function getIcPersonalMetrics(period: string, projectKey?: string): IcPersonalMetricsResponse {
+
+export function getIcPersonalMetrics(period = 'all'): IcPersonalMetricsResponse {
   const cfg = getConfig();
-  const myAccountId = cfg.my_account_id;
+  const myId = cfg.my_account_id;
+
+  if (!myId) {
+    return { error: 'Personal account ID not configured. Please set it in Settings.' } as any;
+  }
+
+  const allTickets = getTickets();
+  const timelines = getTimelines();
+  const timelineMap = new Map(timelines.map(tl => [tl.key, tl]));
+
+  // Filter to my tickets only
+  const myTickets = allTickets.filter(t => t.assignee_id === myId);
+  
+  const weeks = period === '4w' ? 4 : period === '12w' ? 12 : 0;
+  const currentTickets = filterByPeriod(myTickets, weeks);
+  const currentTimelines = currentTickets.map(t => timelineMap.get(t.key)).filter(Boolean) as TicketTimeline[];
+
   const traces: Record<string, string> = {};
 
-  const allTimelines = getTimelines(projectKey);
-  const allTickets = getAllTickets(projectKey);
-  const ticketMap = new Map(allTickets.map(t => [t.key, t]));
+  // 1. Cycle Time Trend (weekly p50)
+  const cycleTimeTrend = computeValueTrend(myTickets, timelineMap, 8, tl => tl.cycleTimeHours);
+  const cycleTimeValues = currentTimelines.map(tl => tl.cycleTimeHours).filter((h): h is number => h != null);
+  const pct = computePercentiles(cycleTimeValues);
+  traces.cycleTimeP50 = `${cycleTimeValues.length} resolved tickets\np50 = ${pct.p50.toFixed(1)}h`;
 
-  // Filter to my tickets
-  const myTimelines = myAccountId
-    ? allTimelines.filter(tl => {
-        const ticket = ticketMap.get(tl.key);
-        return ticket?.assignee_id === myAccountId;
-      })
-    : allTimelines; // If no account configured, show all (degraded mode)
+  // 2. Throughput Trend
+  const throughputTrend = computeCountTrend(myTickets, 8);
 
-  const myTickets = myTimelines
-    .map(tl => ticketMap.get(tl.key))
-    .filter((t): t is ProcessedTicket => t != null);
+  // 3. Aging WIP
+  const agingWip = computeMyAgingWip(myTickets, timelineMap);
 
-  // Filter by period for resolved-ticket metrics
-  const filteredTimelines = filterByPeriod(myTimelines, ticketMap, period);
-  const filteredTickets = filteredTimelines
-    .map(tl => ticketMap.get(tl.key))
-    .filter((t): t is ProcessedTicket => t != null);
+  // 4. Time in Status Breakdown
+  const timeInStatus = computeTimeInStatus(currentTimelines);
 
-  // Cycle time trend (weekly p50 over 8 weeks)
-  const cycleTimeTrend = computeWeeklyCycleTimeTrend(myTimelines, ticketMap);
+  // 5. Rework Rate + Trend
+  const reworkCount = currentTimelines.filter(tl => tl.hasRework).length;
+  const reworkRate = currentTimelines.length > 0 ? (reworkCount / currentTimelines.length) * 100 : 0;
+  const reworkTrend = computeValueTrend(myTickets, timelineMap, 8, tl => tl.hasRework ? 100 : 0);
+  traces.reworkRate = `${reworkCount} tickets with rework / ${currentTimelines.length} total resolved tickets`;
 
-  // Overall cycle time p50
-  const cycleTimes = filteredTimelines
-    .map(tl => tl.cycleTimeHours)
-    .filter((h): h is number => h != null);
-  const ctPerc = computePercentiles(cycleTimes, [50]);
-  const cycleTimeP50 = ctPerc.p50 || null;
+  // 6. Scope Trajectory (avg SP per ticket by month)
+  const scopeTrajectory = computeScopeTrajectory(myTickets, 6);
 
-  // Throughput trend (tickets per week over 8 weeks)
-  const throughput = computeWeeklyThroughputTrend(myTimelines, ticketMap);
+  // 7. SP Estimation Accuracy
+  const spAccuracy = computeSpAccuracy(currentTickets, currentTimelines, cfg.sp_to_days);
+  const icSpTickets = currentTickets.filter(t => (t.story_points ?? 0) > 0);
+  traces.spAccuracy = `${currentTickets.length} tickets\n${icSpTickets.length} had SP > 0\nsp_to_days config = ${cfg.sp_to_days ?? 1}\n${spAccuracy != null ? `Avg accuracy = ${spAccuracy.toFixed(0)}%` : 'Not computable'}`;
 
-  // My aging WIP
-  const agingWip = computeMyAgingWip(myTimelines, ticketMap);
+  // 8. First-time pass rate
+  const firstTimePassRate = 100 - reworkRate;
+  traces.firstTimePassRate = `100% - ${reworkRate.toFixed(1)}% rework rate`;
 
-  // Time in each status (from resolved tickets)
-  const timeInStatus = computeTimeInStatus(filteredTimelines);
+  // 9. Avg Review Wait Time
+  const reviewWaitHours = computeReviewWait(currentTimelines);
+  traces.avgReviewWait = `${currentTimelines.length} resolved tickets\nAvg time in statuses containing "review": ${reviewWaitHours?.toFixed(1) ?? 0}h`;
 
-  // Rework rate + trend
-  const reworkCount = filteredTimelines.filter(tl => tl.hasRework).length;
-  const reworkRate = filteredTimelines.length > 0 ? reworkCount / filteredTimelines.length : 0;
-  const reworkTrend = computeWeeklyReworkTrend(myTimelines, ticketMap);
+  // 10. Focus Score
+  const productTickets = currentTickets.filter(t => ['story', 'task', 'feature'].includes(t.issue_type.toLowerCase()));
+  const focusScore = currentTickets.length > 0 ? (productTickets.length / currentTickets.length) * 100 : null;
+  traces.focusScore = `${productTickets.length} product tickets / ${currentTickets.length} total resolved tickets`;
 
-  // Scope trajectory (avg SP per ticket by month)
-  const scopeTrajectory = computeScopeTrajectory(myTickets);
-
-  // New metrics
-  const spAccuracy = computeSpAccuracy(filteredTickets, filteredTimelines, cfg.sp_to_days ?? 1);
-  const firstTimePassRate = 1 - reworkRate;
-  const avgReviewWaitHours = computeReviewDuration(filteredTimelines);
-
-  const productTypes = new Set(['story', 'task', 'feature', 'enhancement', 'improvement']);
-  const productTicketCount = filteredTickets.filter(t => productTypes.has(t.issue_type.toLowerCase())).length;
-  const focusScore = filteredTickets.length > 0 ? productTicketCount / filteredTickets.length : null;
-
-  // Totals
-  const totalTickets = filteredTickets.length;
-  const totalStoryPoints = filteredTickets.reduce((sum, t) => sum + (t.story_points ?? 0), 0);
-
-  // Team comparison (opt-in only)
+  // 11. Team Comparison (optional)
   let teamComparison: IcTeamComparison[] | null = null;
-  if (cfg.opt_in_team_comparison && myAccountId) {
-    teamComparison = computeTeamComparison(allTimelines, ticketMap, myAccountId, period);
+  if (cfg.opt_in_team_comparison) {
+    teamComparison = computeTeamComparison(currentTickets, currentTimelines, allTickets, timelines, cfg.sp_to_days);
+    traces.teamComparison = `Benchmark based on ${allTickets.length} tickets from the entire team`;
   }
 
-  // Goal progress
-  let goalProgress: Array<{ metric: string; current: number; target: number }> | null = null;
-  if (cfg.personal_goals && Object.keys(cfg.personal_goals).length > 0) {
-    goalProgress = computeGoalProgress(cfg.personal_goals, {
-      cycleTimeP50,
-      reworkRate,
-      totalTickets,
-      totalStoryPoints,
-    });
-  }
-
-  // Build computation traces
-  traces.cycleTimeP50 = `${allTimelines.length} total timelines\nFiltered to my_account_id: ${myTimelines.length}\nPeriod "${period}": ${filteredTimelines.length} resolved\n${cycleTimes.length} had valid cycle time\n${cycleTimeP50 != null ? `p50 = ${cycleTimeP50.toFixed(1)}h` : 'No valid cycle times'}`;
-
-  traces.reworkRate = `${filteredTimelines.length} resolved tickets\n${reworkCount} had backward transitions\nRework rate = ${(reworkRate * 100).toFixed(1)}%`;
-
-  traces.tickets = `My tickets (${myAccountId ? 'filtered' : 'all'}), period "${period}"\n${totalTickets} resolved, ${totalStoryPoints} SP`;
-
-  const icSpTickets = filteredTickets.filter(t => (t.story_points ?? 0) > 0 && (t.eng_hours ?? 0) > 0);
-  traces.spAccuracy = `${filteredTickets.length} tickets\n${icSpTickets.length} had both SP > 0 and eng_hours > 0\nsp_to_days config = ${cfg.sp_to_days ?? 1}\n${spAccuracy != null ? `Avg accuracy = ${spAccuracy.toFixed(0)}%` : 'Not computable'}`;
-
-  traces.firstTimePassRate = `1 − rework rate = 1 − ${(reworkRate * 100).toFixed(1)}% = ${(firstTimePassRate * 100).toFixed(1)}%`;
-
-  traces.avgReviewWait = `${filteredTimelines.length} timelines\n${avgReviewWaitHours != null ? `Avg review wait = ${avgReviewWaitHours.toFixed(1)}h` : 'No review periods found'}`;
-
-  traces.focusScore = `${filteredTickets.length} tickets\n${productTicketCount} product types (story, task, feature, enhancement, improvement)\n${focusScore != null ? `Focus score = ${(focusScore * 100).toFixed(0)}%` : 'No data'}`;
-
-  if (teamComparison) {
-    traces.teamComparison = `${new Map(allTimelines.map(tl => [ticketMap.get(tl.key)?.assignee_id, true])).size} engineers in comparison\n${teamComparison.map(tc => `${tc.metric}: mine = ${tc.myValue.toFixed(1)}, team median = ${tc.teamMedian.toFixed(1)}`).join('\n')}`;
-  }
+  // 12. Goal Progress
+  const goalProgress = computeGoalProgress(currentTickets, currentTimelines, cfg.personal_goals);
 
   return {
     cycleTimeTrend,
-    cycleTimeP50,
-    throughput,
+    cycleTimeP50: pct.p50 || null,
+    throughput: throughputTrend,
     agingWip,
     timeInStatus,
     reworkRate,
@@ -133,10 +91,10 @@ export function getIcPersonalMetrics(period: string, projectKey?: string): IcPer
     scopeTrajectory,
     spAccuracy,
     firstTimePassRate,
-    avgReviewWaitHours,
+    avgReviewWaitHours: reviewWaitHours,
     focusScore,
-    totalTickets,
-    totalStoryPoints,
+    totalTickets: currentTickets.length,
+    totalStoryPoints: currentTickets.reduce((s, t) => s + (t.story_points ?? 0), 0),
     teamComparison,
     goalProgress,
     period,
@@ -146,300 +104,165 @@ export function getIcPersonalMetrics(period: string, projectKey?: string): IcPer
 
 // --- Helpers ---
 
-function filterByPeriod(
-  timelines: TicketTimeline[],
-  ticketMap: Map<string, ProcessedTicket>,
-  period: string,
-): TicketTimeline[] {
-  if (period === 'all') return timelines;
-
-  const periodDays: Record<string, number> = {
-    daily: 1,
-    weekly: 7,
-    'bi-weekly': 14,
-    monthly: 30,
-    quarterly: 90,
-    'half-yearly': 180,
-  };
-  const days = periodDays[period] ?? 30;
+function filterByPeriod(tickets: ProcessedTicket[], weeks: number): ProcessedTicket[] {
+  if (weeks === 0) return tickets;
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-
-  return timelines.filter(tl => {
-    const ticket = ticketMap.get(tl.key);
-    if (!ticket?.resolved) return false;
-    return new Date(ticket.resolved) >= cutoff;
-  });
+  cutoff.setDate(cutoff.getDate() - weeks * 7);
+  return tickets.filter((t) => t.resolved && new Date(t.resolved) >= cutoff);
 }
 
-/**
- * Weekly cycle time p50 trend over 8 weeks.
- */
-function computeWeeklyCycleTimeTrend(
-  timelines: TicketTimeline[],
-  ticketMap: Map<string, ProcessedTicket>,
-): IcWeeklyTrend[] {
-  const weeks = 8;
-  const now = new Date();
+function computeValueTrend(tickets: ProcessedTicket[], timelineMap: Map<string, TicketTimeline>, weeks: number, valueFn: (tl: TicketTimeline) => number | null): IcWeeklyTrend[] {
   const result: IcWeeklyTrend[] = [];
+  const now = new Date();
 
-  for (let w = weeks - 1; w >= 0; w--) {
+  for (let i = weeks - 1; i >= 0; i--) {
     const weekEnd = new Date(now);
-    weekEnd.setDate(weekEnd.getDate() - w * 7);
+    weekEnd.setDate(weekEnd.getDate() - i * 7);
     const weekStart = new Date(weekEnd);
     weekStart.setDate(weekStart.getDate() - 7);
 
-    const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()}`;
-    const weekCycleTimes = timelines
-      .filter(tl => {
-        if (tl.cycleTimeHours == null) return false;
-        const ticket = ticketMap.get(tl.key);
-        if (!ticket?.resolved) return false;
-        const resolvedDate = new Date(ticket.resolved);
-        return resolvedDate >= weekStart && resolvedDate < weekEnd;
-      })
-      .map(tl => tl.cycleTimeHours!)
-      .filter((h): h is number => h != null);
+    const weekTickets = tickets.filter(t => t.resolved && new Date(t.resolved) >= weekStart && new Date(t.resolved) < weekEnd);
+    const weekValues = weekTickets.map(t => {
+      const tl = timelineMap.get(t.key);
+      return tl ? valueFn(tl) : null;
+    }).filter((v): v is number => v != null);
 
-    const perc = computePercentiles(weekCycleTimes, [50]);
-    result.push({ week: weekLabel, value: perc.p50 });
-  }
+    const avg = weekValues.length > 0 ? weekValues.reduce((a, b) => a + b, 0) / weekValues.length : 0;
 
-  return result;
-}
-
-/**
- * Weekly throughput (tickets done per week) over 8 weeks.
- */
-function computeWeeklyThroughputTrend(
-  timelines: TicketTimeline[],
-  ticketMap: Map<string, ProcessedTicket>,
-): IcWeeklyTrend[] {
-  const weeks = 8;
-  const now = new Date();
-  const result: IcWeeklyTrend[] = [];
-
-  for (let w = weeks - 1; w >= 0; w--) {
-    const weekEnd = new Date(now);
-    weekEnd.setDate(weekEnd.getDate() - w * 7);
-    const weekStart = new Date(weekEnd);
-    weekStart.setDate(weekStart.getDate() - 7);
-
-    const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()}`;
-    let count = 0;
-
-    for (const tl of timelines) {
-      const donePeriod = tl.statusPeriods.find(p => p.category === 'done');
-      if (donePeriod) {
-        const doneDate = new Date(donePeriod.enteredAt);
-        if (doneDate >= weekStart && doneDate < weekEnd) {
-          count++;
-        }
-      }
-    }
-
-    result.push({ week: weekLabel, value: count });
-  }
-
-  return result;
-}
-
-/**
- * My aging WIP — in-progress tickets.
- */
-function computeMyAgingWip(
-  timelines: TicketTimeline[],
-  ticketMap: Map<string, ProcessedTicket>,
-): IcAgingItem[] {
-  const items: IcAgingItem[] = [];
-
-  for (const tl of timelines) {
-    const lastPeriod = tl.statusPeriods[tl.statusPeriods.length - 1];
-    if (!lastPeriod || lastPeriod.category === 'done' || lastPeriod.category === 'wait') continue;
-
-    const ticket = ticketMap.get(tl.key);
-    if (!ticket) continue;
-
-    items.push({
-      key: tl.key,
-      summary: ticket.summary,
-      status: tl.currentStatus,
-      daysInStatus: Math.round(tl.daysInCurrentStatus),
-      storyPoints: ticket.story_points,
+    result.push({
+      week: `${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
+      value: Math.round(avg * 10) / 10,
     });
   }
-
-  return items.sort((a, b) => b.daysInStatus - a.daysInStatus);
+  return result;
 }
 
-/**
- * Time in each status aggregated from resolved timelines.
- */
+function computeCountTrend(tickets: ProcessedTicket[], weeks: number): IcWeeklyTrend[] {
+  const result: IcWeeklyTrend[] = [];
+  const now = new Date();
+
+  for (let i = weeks - 1; i >= 0; i--) {
+    const weekEnd = new Date(now);
+    weekEnd.setDate(weekEnd.getDate() - i * 7);
+    const weekStart = new Date(weekEnd);
+    weekStart.setDate(weekStart.getDate() - 7);
+
+    const count = tickets.filter(t => t.resolved && new Date(t.resolved) >= weekStart && new Date(t.resolved) < weekEnd).length;
+
+    result.push({
+      week: `${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
+      value: count,
+    });
+  }
+  return result;
+}
+
+function computeMyAgingWip(myTickets: ProcessedTicket[], timelineMap: Map<string, TicketTimeline>): IcAgingItem[] {
+  const activeStatuses = getConfig().active_statuses.map(s => s.toLowerCase());
+  const myWip = myTickets.filter(t => activeStatuses.includes(t.status.toLowerCase()));
+
+  return myWip.map(t => {
+    const tl = timelineMap.get(t.key);
+    return {
+      key: t.key,
+      summary: t.summary,
+      status: t.status,
+      daysInStatus: tl ? Math.round(tl.daysInCurrentStatus * 10) / 10 : 0,
+      storyPoints: t.story_points,
+    };
+  }).sort((a, b) => b.daysInStatus - a.daysInStatus);
+}
+
 function computeTimeInStatus(timelines: TicketTimeline[]): IcTimeInStatus[] {
   const byStatus = new Map<string, number>();
   let totalHours = 0;
 
   for (const tl of timelines) {
-    for (const sp of tl.statusPeriods) {
-      const current = byStatus.get(sp.status) ?? 0;
-      byStatus.set(sp.status, current + sp.durationHours);
-      totalHours += sp.durationHours;
+    for (const p of tl.statusPeriods) {
+      if (p.category === 'done') continue;
+      byStatus.set(p.status, (byStatus.get(p.status) ?? 0) + p.durationHours);
+      totalHours += p.durationHours;
     }
   }
 
-  return Array.from(byStatus.entries())
-    .map(([status, hours]) => ({
-      status,
-      hours,
-      percentage: totalHours > 0 ? (hours / totalHours) * 100 : 0,
-    }))
-    .sort((a, b) => b.hours - a.hours);
+  return Array.from(byStatus.entries()).map(([status, hours]) => ({
+    status,
+    hours: Math.round(hours),
+    percentage: totalHours > 0 ? (hours / totalHours) * 100 : 0,
+  })).sort((a, b) => b.hours - a.hours);
 }
 
-/**
- * Weekly rework rate trend over 8 weeks.
- */
-function computeWeeklyReworkTrend(
-  timelines: TicketTimeline[],
-  ticketMap: Map<string, ProcessedTicket>,
-): IcWeeklyTrend[] {
-  const weeks = 8;
+function computeScopeTrajectory(tickets: ProcessedTicket[], months: number): IcPersonalMetricsResponse['scopeTrajectory'] {
+  const result: IcPersonalMetricsResponse['scopeTrajectory'] = [];
   const now = new Date();
-  const result: IcWeeklyTrend[] = [];
 
-  for (let w = weeks - 1; w >= 0; w--) {
-    const weekEnd = new Date(now);
-    weekEnd.setDate(weekEnd.getDate() - w * 7);
-    const weekStart = new Date(weekEnd);
-    weekStart.setDate(weekStart.getDate() - 7);
+  for (let i = months - 1; i >= 0; i--) {
+    const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
 
-    const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()}`;
-    const weekTimelines = timelines.filter(tl => {
-      const ticket = ticketMap.get(tl.key);
-      if (!ticket?.resolved) return false;
-      const resolvedDate = new Date(ticket.resolved);
-      return resolvedDate >= weekStart && resolvedDate < weekEnd;
+    const monthTickets = tickets.filter(t => t.resolved && new Date(t.resolved) >= monthStart && new Date(t.resolved) <= monthEnd);
+    const totalSp = monthTickets.reduce((s, t) => s + (t.story_points ?? 0), 0);
+    const avgSp = monthTickets.length > 0 ? totalSp / monthTickets.length : 0;
+
+    result.push({
+      month: monthStart.toLocaleString('default', { month: 'short' }),
+      avgSp: Math.round(avgSp * 10) / 10,
     });
-
-    const reworkCount = weekTimelines.filter(tl => tl.hasRework).length;
-    const rate = weekTimelines.length > 0 ? reworkCount / weekTimelines.length : 0;
-    result.push({ week: weekLabel, value: rate });
   }
-
   return result;
 }
 
-/**
- * Scope trajectory — avg story points per ticket by month.
- */
-function computeScopeTrajectory(
-  tickets: ProcessedTicket[],
-): Array<{ month: string; avgSp: number }> {
-  const byMonth = new Map<string, { totalSP: number; count: number }>();
-
-  for (const t of tickets) {
-    if (!t.resolved) continue;
-    const d = new Date(t.resolved);
-    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    const entry = byMonth.get(monthKey) ?? { totalSP: 0, count: 0 };
-    entry.totalSP += t.story_points ?? 0;
-    entry.count++;
-    byMonth.set(monthKey, entry);
+function computeReviewWait(timelines: TicketTimeline[]): number | null {
+  const durations: number[] = [];
+  for (const tl of timelines) {
+    let hours = 0;
+    let found = false;
+    for (const p of tl.statusPeriods) {
+      if (p.status.toLowerCase().includes('review')) {
+        hours += p.durationHours;
+        found = true;
+      }
+    }
+    if (found) durations.push(hours);
   }
-
-  return Array.from(byMonth.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, data]) => ({
-      month,
-      avgSp: data.count > 0 ? data.totalSP / data.count : 0,
-    }));
+  return durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : null;
 }
 
-/**
- * Anonymous team comparison — compares IC metrics to team medians.
- */
 function computeTeamComparison(
+  myTickets: ProcessedTicket[],
+  myTimelines: TicketTimeline[],
+  allTickets: ProcessedTicket[],
   allTimelines: TicketTimeline[],
-  ticketMap: Map<string, ProcessedTicket>,
-  myAccountId: string,
-  period: string,
+  spToDays: number
 ): IcTeamComparison[] {
-  // Group timelines by assignee
-  const byAssignee = new Map<string, TicketTimeline[]>();
-  for (const tl of allTimelines) {
-    const ticket = ticketMap.get(tl.key);
-    if (!ticket?.assignee_id) continue;
-    if (!byAssignee.has(ticket.assignee_id)) {
-      byAssignee.set(ticket.assignee_id, []);
-    }
-    byAssignee.get(ticket.assignee_id)!.push(tl);
-  }
+  const myCycleP50 = computePercentiles(myTimelines.map(tl => tl.cycleTimeHours).filter((h): h is number => h != null)).p50;
+  const teamCycleP50 = computePercentiles(allTimelines.map(tl => tl.cycleTimeHours).filter((h): h is number => h != null)).p50;
 
-  // Compute per-engineer cycle time p50
-  const engineerCycleTimesP50: number[] = [];
-  let myCycleTimeP50 = 0;
+  const myRework = myTimelines.length > 0 ? (myTimelines.filter(tl => tl.hasRework).length / myTimelines.length) * 100 : 0;
+  const teamRework = allTimelines.length > 0 ? (allTimelines.filter(tl => tl.hasRework).length / allTimelines.length) * 100 : 0;
 
-  // Compute per-engineer rework rates
-  const engineerReworkRates: number[] = [];
-  let myReworkRate = 0;
-
-  // Compute per-engineer ticket counts
-  const engineerTicketCounts: number[] = [];
-  let myTicketCount = 0;
-
-  for (const [accountId, tls] of byAssignee) {
-    const filteredTls = filterByPeriod(tls, ticketMap, period);
-    const cts = filteredTls.map(tl => tl.cycleTimeHours).filter((h): h is number => h != null);
-    const perc = computePercentiles(cts, [50]);
-    const rework = filteredTls.length > 0
-      ? filteredTls.filter(tl => tl.hasRework).length / filteredTls.length
-      : 0;
-
-    if (accountId === myAccountId) {
-      myCycleTimeP50 = perc.p50;
-      myReworkRate = rework;
-      myTicketCount = filteredTls.length;
-    }
-
-    engineerCycleTimesP50.push(perc.p50);
-    engineerReworkRates.push(rework);
-    engineerTicketCounts.push(filteredTls.length);
-  }
-
-  const median = (arr: number[]) => {
-    if (arr.length === 0) return 0;
-    const sorted = [...arr].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
-  };
+  const myAccuracy = computeSpAccuracy(myTickets, myTimelines, spToDays) || 0;
+  const teamAccuracy = computeSpAccuracy(allTickets, allTimelines, spToDays) || 0;
 
   return [
-    { metric: 'Cycle Time p50 (hours)', myValue: myCycleTimeP50, teamMedian: median(engineerCycleTimesP50) },
-    { metric: 'Rework Rate', myValue: myReworkRate, teamMedian: median(engineerReworkRates) },
-    { metric: 'Throughput (tickets)', myValue: myTicketCount, teamMedian: median(engineerTicketCounts) },
+    { metric: 'Cycle Time (p50)', myValue: myCycleP50, teamMedian: teamCycleP50 },
+    { metric: 'Rework Rate (%)', myValue: myRework, teamMedian: teamRework },
+    { metric: 'Estimation Accuracy (%)', myValue: myAccuracy, teamMedian: teamAccuracy },
   ];
 }
 
-/**
- * Goal progress — compare current values to personal targets.
- */
-function computeGoalProgress(
-  goals: Record<string, number>,
-  current: { cycleTimeP50: number | null; reworkRate: number; totalTickets: number; totalStoryPoints: number },
-): Array<{ metric: string; current: number; target: number }> {
-  const mapping: Record<string, { label: string; value: number }> = {
-    cycle_time_p50: { label: 'Cycle Time p50 (hours)', value: current.cycleTimeP50 ?? 0 },
-    rework_rate: { label: 'Rework Rate', value: current.reworkRate },
-    tickets: { label: 'Tickets Completed', value: current.totalTickets },
-    story_points: { label: 'Story Points', value: current.totalStoryPoints },
-  };
+function computeGoalProgress(tickets: ProcessedTicket[], timelines: TicketTimeline[], goals?: Record<string, number>): IcPersonalMetricsResponse['goalProgress'] {
+  if (!goals) return null;
 
-  const result: Array<{ metric: string; current: number; target: number }> = [];
-  for (const [key, target] of Object.entries(goals)) {
-    const m = mapping[key];
-    if (m) {
-      result.push({ metric: m.label, current: m.value, target });
-    }
+  const results: Array<{ metric: string; current: number; target: number }> = [];
+
+  if (goals.cycle_time) {
+    const p50 = computePercentiles(timelines.map(tl => tl.cycleTimeHours).filter((h): h is number => h != null)).p50;
+    results.push({ metric: 'Cycle Time (p50)', current: p50, target: goals.cycle_time });
   }
-  return result;
+  if (goals.throughput) {
+    results.push({ metric: 'Weekly Throughput', current: tickets.length / 4, target: goals.throughput });
+  }
+
+  return results.length > 0 ? results : null;
 }

@@ -1,102 +1,83 @@
 import { getConfig } from './config.service.js';
-import { getAllTickets } from './ticket.service.js';
-import {
-  getTimelines, computePercentiles, computeWeeklyThroughput,
-  computeSpAccuracy, computeReviewDuration, computeLeadTimeBreakdown, computeWorkTypeDistribution,
-} from './timeline.service.js';
-import type {
-  EmTeamMetricsResponse,
-  EmIndividualMetricsResponse,
-  CycleTimeDistribution,
-  WorkStreamThroughput,
-  ContributionEntry,
-  AgingWipEntry,
-  EngineerBugRatio,
-  EmEngineerDetail,
-  ProcessedTicket,
-  TicketTimeline,
-} from '../../shared/types.js';
-
-const BUG_TYPES = new Set(['bug', 'defect']);
+import { getTickets } from './ticket.service.js';
+import { getTimelines, computeSpAccuracy, computeReviewDuration, computeLeadTimeBreakdown, computeWorkTypeDistribution, computePercentiles } from './timeline.service.js';
+import type { EmTeamMetricsResponse, EmIndividualMetricsResponse, ProcessedTicket, TicketTimeline, CycleTimeDistribution, WorkStreamThroughput, ContributionEntry, AgingWipEntry, EngineerBugRatio } from '../../shared/types.js';
 
 /**
- * EM Team Metrics — cycle time distribution, throughput, contribution,
- * aging WIP, bug ratios, rework rate.
+ * EM Persona Metrics — computed from tickets and timelines.
  */
-export function getEmTeamMetrics(period: string, projectKey?: string): EmTeamMetricsResponse {
+
+export function getEmTeamMetrics(period = 'all', projectKey?: string): EmTeamMetricsResponse {
+  const allTickets = getTickets(projectKey);
   const timelines = getTimelines(projectKey);
-  const tickets = getAllTickets(projectKey);
-  const ticketMap = new Map(tickets.map(t => [t.key, t]));
+  const timelineMap = new Map(timelines.map(tl => [tl.key, tl]));
   const cfg = getConfig();
-  const trackedIds = new Set((cfg.tracked_engineers ?? []).map(e => e.accountId));
+
+  // Filter by tracked engineers if configured
+  const trackedIds = cfg.tracked_engineers.map(e => e.accountId);
+  const scopedTickets = trackedIds.length > 0 
+    ? allTickets.filter(t => t.assignee_id && trackedIds.includes(t.assignee_id))
+    : allTickets;
+
+  const weeks = period === '4w' ? 4 : period === '12w' ? 12 : 0;
+  const currentTickets = filterByPeriod(scopedTickets, weeks);
+  const currentTimelines = currentTickets.map(t => timelineMap.get(t.key)).filter(Boolean) as TicketTimeline[];
+
   const traces: Record<string, string> = {};
 
-  // Filter by period
-  const filteredTimelines = filterByPeriod(timelines, ticketMap, period);
+  // 1. Cycle Time Distribution
+  const cycleTimeValues = currentTimelines.map(tl => tl.cycleTimeHours).filter((h): h is number => h != null);
+  const pct = computePercentiles(cycleTimeValues);
+  const cycleTime: CycleTimeDistribution = {
+    p50: pct.p50,
+    p85: pct.p85,
+    p95: pct.p95,
+    trend: computeCycleTimeTrend(scopedTickets, timelineMap, 4),
+  };
+  traces.cycleTimeP50 = `${cycleTimeValues.length} resolved tickets with valid cycle time\np50 = ${pct.p50.toFixed(1)}h`;
 
-  // Always scope to tracked engineers (empty = show none)
-  const scopedTimelines = filteredTimelines.filter(tl => {
-    const t = ticketMap.get(tl.key);
-    return t?.assignee_id != null && trackedIds.has(t.assignee_id);
-  });
-  const scopedTickets = scopedTimelines
-    .map(tl => ticketMap.get(tl.key))
-    .filter((t): t is ProcessedTicket => t != null);
+  // 2. Throughput by Work Stream
+  const throughputByWorkStream = computeThroughputByWorkStream(currentTickets);
 
-  // Cycle time distribution (scoped to tracked engineers)
-  const cycleTime = computeCycleTimeDistribution(scopedTimelines);
+  // 3. Weekly Throughput (8 weeks)
+  const weeklyThroughput = computeWeeklyThroughputWithSP(scopedTickets, timelineMap, 8);
 
-  // Throughput by work stream (scoped to tracked engineers)
-  const throughputByWorkStream = computeWorkStreamThroughput(scopedTickets);
+  // 4. Contribution Spread (normalized SP)
+  const contributionSpread = computeContributionSpread(currentTickets);
 
-  // Weekly throughput (scoped to tracked engineers)
-  const scopedAllTimelines = timelines.filter(tl => {
-    const t = ticketMap.get(tl.key);
-    return t?.assignee_id != null && trackedIds.has(t.assignee_id);
-  });
-  const weeklyThroughput = computeWeeklyThroughput(scopedAllTimelines, 8);
+  // 5. Aging WIP (from all tickets, not just resolved)
+  const agingWip = computeAgingWip(allTickets, timelineMap);
 
-  // Contribution spread (scoped to tracked engineers)
-  const contributionSpread = computeContributionSpread(scopedTickets);
+  // 6. Bug Ratio by Engineer
+  const bugRatioByEngineer = computeBugRatioByEngineer(currentTickets);
 
-  // Aging WIP (scoped to tracked engineers)
-  const thresholds = cfg.aging_thresholds ?? { warning_days: 3, critical_days: 7, escalation_days: 14 };
-  const agingWip = computeAgingWip(scopedAllTimelines, ticketMap, thresholds);
+  // 7. Rework Rate
+  const reworkCount = currentTimelines.filter(tl => tl.hasRework).length;
+  const reworkRate = currentTimelines.length > 0 ? (reworkCount / currentTimelines.length) * 100 : 0;
+  traces.reworkRate = `${reworkCount} tickets with rework / ${currentTimelines.length} total resolved tickets`;
 
-  // Bug ratio by engineer (scoped to tracked engineers)
-  const bugRatioByEngineer = computeBugRatioByEngineer(scopedTickets);
+  // 8. SP Estimation Accuracy
+  const spAccuracy = computeSpAccuracy(currentTickets, currentTimelines, cfg.sp_to_days);
+  const spTickets = currentTickets.filter(t => (t.story_points ?? 0) > 0);
+  traces.spAccuracy = `${currentTickets.length} tickets\n${spTickets.length} had SP > 0\nsp_to_days config = ${cfg.sp_to_days ?? 1}\n${spAccuracy != null ? `Avg accuracy = ${spAccuracy.toFixed(0)}%` : 'Not computable (no qualifying tickets)'}`;
 
-  // Rework rate (scoped to tracked engineers)
-  const reworkCount = scopedTimelines.filter(tl => tl.hasRework).length;
-  const reworkRate = scopedTimelines.length > 0 ? reworkCount / scopedTimelines.length : 0;
+  // 9. First-time pass rate
+  const firstTimePassRate = 100 - reworkRate;
 
-  // New metrics
-  const spAccuracy = computeSpAccuracy(scopedTickets, scopedTimelines, cfg.sp_to_days ?? 1);
-  const firstTimePassRate = 1 - reworkRate;
-  const avgReviewDurationHours = computeReviewDuration(scopedTimelines);
-  const workTypeDistribution = computeWorkTypeDistribution(scopedTickets);
-  const unestimatedCount = scopedTickets.filter(t => t.story_points == null || t.story_points === 0).length;
-  const unestimatedRatio = scopedTickets.length > 0 ? unestimatedCount / scopedTickets.length : 0;
-  const leadTimeBreakdown = computeLeadTimeBreakdown(scopedTimelines);
+  // 10. Avg Review Duration
+  const avgReviewDurationHours = computeReviewDuration(currentTimelines);
+  traces.avgReviewDuration = `${currentTimelines.length} resolved tickets\nAvg time in statuses containing "review": ${avgReviewDurationHours?.toFixed(1) ?? 0}h`;
 
-  // Totals (scoped to tracked engineers)
-  const totalTickets = scopedTickets.length;
-  const totalStoryPoints = scopedTickets.reduce((sum, t) => sum + (t.story_points ?? 0), 0);
+  // 11. Work Type Distribution
+  const workTypeDistribution = computeWorkTypeDistribution(currentTickets);
 
-  // Build computation traces
-  traces.totalTickets = `${timelines.length} total timelines, ${tickets.length} tickets\nPeriod "${period}": ${filteredTimelines.length} resolved tickets remain\nScoped to ${trackedIds.size} tracked engineers: ${scopedTimelines.length} timelines\n${totalTickets} tickets, ${totalStoryPoints} SP`;
+  // 12. Unestimated Ratio
+  const unestimatedCount = currentTickets.filter(t => t.story_points == null || t.story_points === 0).length;
+  const unestimatedRatio = currentTickets.length > 0 ? (unestimatedCount / currentTickets.length) * 100 : 0;
+  traces.unestimatedRatio = `${unestimatedCount} unestimated / ${currentTickets.length} total tickets`;
 
-  const ctValid = scopedTimelines.map(tl => tl.cycleTimeHours).filter((h): h is number => h != null);
-  traces.cycleTimeP50 = `${scopedTimelines.length} scoped timelines\n${ctValid.length} had valid cycle time (first active → done)\n${ctValid.length > 0 ? `Range: ${Math.min(...ctValid).toFixed(1)}h – ${Math.max(...ctValid).toFixed(1)}h\np50 = ${cycleTime.p50.toFixed(1)}h, p85 = ${cycleTime.p85.toFixed(1)}h, p95 = ${cycleTime.p95.toFixed(1)}h` : 'No valid cycle times'}`;
-
-  traces.reworkRate = `${scopedTimelines.length} resolved tickets\n${reworkCount} had backward transitions\nRework rate = ${reworkCount}/${scopedTimelines.length} = ${(reworkRate * 100).toFixed(1)}%\nFirst-time pass rate = ${(firstTimePassRate * 100).toFixed(1)}%`;
-
-  const spTickets = scopedTickets.filter(t => (t.story_points ?? 0) > 0 && (t.eng_hours ?? 0) > 0);
-  traces.spAccuracy = `${scopedTickets.length} tickets\n${spTickets.length} had both SP > 0 and eng_hours > 0\nsp_to_days config = ${cfg.sp_to_days ?? 1}\n${spAccuracy != null ? `Avg accuracy = ${spAccuracy.toFixed(0)}%` : 'Not computable (no qualifying tickets)'}`;
-
-  traces.avgReviewDuration = `${scopedTimelines.length} timelines\n${avgReviewDurationHours != null ? `Avg review duration = ${avgReviewDurationHours.toFixed(1)}h` : 'No review periods found'}`;
-
-  traces.unestimatedRatio = `${scopedTickets.length} tickets\n${unestimatedCount} had SP = null or 0\nUnestimated ratio = ${(unestimatedRatio * 100).toFixed(1)}%`;
+  // 13. Lead Time Breakdown
+  const leadTimeBreakdown = computeLeadTimeBreakdown(currentTimelines);
 
   return {
     cycleTime,
@@ -112,123 +93,85 @@ export function getEmTeamMetrics(period: string, projectKey?: string): EmTeamMet
     workTypeDistribution,
     unestimatedRatio,
     leadTimeBreakdown,
-    totalTickets,
-    totalStoryPoints,
+    totalTickets: currentTickets.length,
+    totalStoryPoints: currentTickets.reduce((s, t) => s + (t.story_points ?? 0), 0),
     period,
     traces,
   };
 }
 
-/**
- * EM Individual Metrics — per-engineer cycle time, rework, bug ratio,
- * complexity, focus ratio with team averages.
- */
-export function getEmIndividualMetrics(period: string, projectKey?: string): EmIndividualMetricsResponse {
+export function getEmIndividualMetrics(period = 'all', projectKey?: string): EmIndividualMetricsResponse {
+  const allTickets = getTickets(projectKey);
   const timelines = getTimelines(projectKey);
-  const tickets = getAllTickets(projectKey);
-  const ticketMap = new Map(tickets.map(t => [t.key, t]));
+  const timelineMap = new Map(timelines.map(tl => [tl.key, tl]));
   const cfg = getConfig();
-  const trackedIds = new Set((cfg.tracked_engineers ?? []).map(e => e.accountId));
-  const traces: Record<string, string> = {};
 
-  const filteredTimelines = filterByPeriod(timelines, ticketMap, period);
+  const trackedIds = cfg.tracked_engineers.map(e => e.accountId);
+  const engineers = cfg.tracked_engineers.length > 0 
+    ? cfg.tracked_engineers 
+    : Array.from(new Set(allTickets.map(t => t.assignee_id))).filter(Boolean).map(id => ({
+        accountId: id!,
+        displayName: allTickets.find(t => t.assignee_id === id)?.assignee ?? 'Unknown',
+      }));
 
-  // Group by assignee — always scoped to tracked engineers (empty = show none)
-  const byAssignee = new Map<string, { timelines: TicketTimeline[]; tickets: ProcessedTicket[] }>();
+  const weeks = period === '4w' ? 4 : period === '12w' ? 12 : 0;
+  const currentTickets = filterByPeriod(allTickets, weeks);
 
-  for (const tl of filteredTimelines) {
-    const ticket = ticketMap.get(tl.key);
-    if (!ticket || !ticket.assignee_id) continue;
-    if (!trackedIds.has(ticket.assignee_id)) continue;
+  const engineerMetrics = engineers.map(eng => {
+    const eTickets = currentTickets.filter(t => t.assignee_id === eng.accountId);
+    const eTimelines = eTickets.map(t => timelineMap.get(t.key)).filter(Boolean) as TicketTimeline[];
+    
+    const cycleTimes = eTimelines.map(tl => tl.cycleTimeHours).filter((h): h is number => h != null);
+    const pct = computePercentiles(cycleTimes);
+    
+    const reworkCount = eTimelines.filter(tl => tl.hasRework).length;
+    const reworkRate = eTimelines.length > 0 ? (reworkCount / eTimelines.length) * 100 : 0;
+    
+    const bugs = eTickets.filter(t => t.issue_type.toLowerCase().includes('bug')).length;
+    const bugRatio = eTickets.length > 0 ? (bugs / eTickets.length) * 100 : 0;
 
-    if (!byAssignee.has(ticket.assignee_id)) {
-      byAssignee.set(ticket.assignee_id, { timelines: [], tickets: [] });
-    }
-    const group = byAssignee.get(ticket.assignee_id)!;
-    group.timelines.push(tl);
-    group.tickets.push(ticket);
-  }
+    // Focus ratio: % of product work vs bugs/maint
+    const productTickets = eTickets.filter(t => ['story', 'task', 'feature'].includes(t.issue_type.toLowerCase()));
+    const focusRatio = eTickets.length > 0 ? (productTickets.length / eTickets.length) * 100 : null;
 
-  const engineers: EmEngineerDetail[] = [];
-
-  for (const [accountId, group] of byAssignee) {
-    const ticket = group.tickets[0];
-    const displayName = ticket.assignee;
-    const cycleTimes = group.timelines
-      .map(tl => tl.cycleTimeHours)
-      .filter((h): h is number => h != null);
-    const cycleTimePerc = computePercentiles(cycleTimes, [50, 85]);
-
-    const reworkCount = group.timelines.filter(tl => tl.hasRework).length;
-    const reworkRate = group.timelines.length > 0 ? reworkCount / group.timelines.length : 0;
-
-    const bugCount = group.tickets.filter(t => BUG_TYPES.has(t.issue_type.toLowerCase())).length;
-    const bugRatio = group.tickets.length > 0 ? bugCount / group.tickets.length : 0;
-
-    const totalSP = group.tickets.reduce((sum, t) => sum + (t.story_points ?? 0), 0);
-    const complexityScore = group.tickets.length > 0 ? totalSP / group.tickets.length : null;
-
-    const productTypes = new Set(['story', 'task', 'feature', 'enhancement', 'improvement']);
-    const productTickets = group.tickets.filter(t => productTypes.has(t.issue_type.toLowerCase())).length;
-    const focusRatio = group.tickets.length > 0 ? productTickets / group.tickets.length : null;
-
-    const engSpAccuracy = computeSpAccuracy(group.tickets, group.timelines, cfg.sp_to_days ?? 1);
-    const engFirstTimePassRate = 1 - reworkRate;
-
-    engineers.push({
-      accountId,
-      displayName,
-      cycleTimeP50: cycleTimePerc.p50 || null,
-      cycleTimeP85: cycleTimePerc.p85 || null,
+    return {
+      accountId: eng.accountId,
+      displayName: eng.displayName,
+      cycleTimeP50: pct.p50 || null,
+      cycleTimeP85: pct.p85 || null,
       reworkRate,
       bugRatio,
-      tickets: group.tickets.length,
-      storyPoints: totalSP,
-      complexityScore,
+      tickets: eTickets.length,
+      storyPoints: eTickets.reduce((s, t) => s + (t.story_points ?? 0), 0),
+      complexityScore: eTickets.length > 0 ? eTickets.reduce((s, t) => s + (t.story_points ?? 0), 0) / eTickets.length : null,
       focusRatio,
-      spAccuracy: engSpAccuracy,
-      firstTimePassRate: engFirstTimePassRate,
-    });
-  }
+      spAccuracy: computeSpAccuracy(eTickets, eTimelines, cfg.sp_to_days),
+      firstTimePassRate: 100 - reworkRate,
+    };
+  });
 
   // Team averages
-  const allCycleTimes = filteredTimelines
-    .map(tl => tl.cycleTimeHours)
-    .filter((h): h is number => h != null);
-  const teamCycleTime = computePercentiles(allCycleTimes, [50]);
+  const teamTimelines = currentTickets.map(t => timelineMap.get(t.key)).filter(Boolean) as TicketTimeline[];
+  const teamCycleTimes = teamTimelines.map(tl => tl.cycleTimeHours).filter((h): h is number => h != null);
+  const teamPct = computePercentiles(teamCycleTimes);
+  const teamReworkCount = teamTimelines.filter(tl => tl.hasRework).length;
+  const teamReworkRate = teamTimelines.length > 0 ? (teamReworkCount / teamTimelines.length) * 100 : 0;
+  const teamBugs = currentTickets.filter(t => t.issue_type.toLowerCase().includes('bug')).length;
 
-  const teamBugCount = filteredTimelines
-    .map(tl => ticketMap.get(tl.key))
-    .filter((t): t is ProcessedTicket => t != null)
-    .filter(t => BUG_TYPES.has(t.issue_type.toLowerCase())).length;
-  const teamReworkCount = filteredTimelines.filter(tl => tl.hasRework).length;
-
-  const totalTickets = filteredTimelines.length;
-  const totalSP = filteredTimelines
-    .map(tl => ticketMap.get(tl.key))
-    .filter((t): t is ProcessedTicket => t != null)
-    .reduce((sum, t) => sum + (t.story_points ?? 0), 0);
-
-  // Team-wide SP accuracy and first-time pass rate
-  const teamReworkRate = totalTickets > 0 ? teamReworkCount / totalTickets : 0;
-  const allFilteredTickets = filteredTimelines
-    .map(tl => ticketMap.get(tl.key))
-    .filter((t): t is ProcessedTicket => t != null);
-  const teamSpAccuracy = computeSpAccuracy(allFilteredTickets, filteredTimelines, cfg.sp_to_days ?? 1);
-
-  // Build computation traces
-  traces.teamAvg = `${timelines.length} total timelines\nPeriod "${period}": ${filteredTimelines.length} resolved\n${byAssignee.size} engineers tracked\nTeam avg cycle p50 = ${teamCycleTime.p50 > 0 ? teamCycleTime.p50.toFixed(1) + 'h' : '—'}, rework = ${(teamReworkRate * 100).toFixed(1)}%, bug ratio = ${(totalTickets > 0 ? (teamBugCount / totalTickets) * 100 : 0).toFixed(1)}%`;
+  const traces: Record<string, string> = {
+    teamAvg: `Computed from ${currentTickets.length} tickets across ${engineers.length} tracked engineers`,
+  };
 
   return {
-    engineers,
+    engineers: engineerMetrics,
     teamAverages: {
-      cycleTimeP50: teamCycleTime.p50 || null,
+      cycleTimeP50: teamPct.p50 || null,
       reworkRate: teamReworkRate,
-      bugRatio: totalTickets > 0 ? teamBugCount / totalTickets : 0,
-      tickets: totalTickets,
-      storyPoints: totalSP,
-      spAccuracy: teamSpAccuracy,
-      firstTimePassRate: 1 - teamReworkRate,
+      bugRatio: currentTickets.length > 0 ? (teamBugs / currentTickets.length) * 100 : 0,
+      tickets: currentTickets.length / (engineers.length || 1),
+      storyPoints: currentTickets.reduce((s, t) => s + (t.story_points ?? 0), 0) / (engineers.length || 1),
+      spAccuracy: computeSpAccuracy(currentTickets, teamTimelines, cfg.sp_to_days),
+      firstTimePassRate: 100 - teamReworkRate,
     },
     period,
     traces,
@@ -237,169 +180,138 @@ export function getEmIndividualMetrics(period: string, projectKey?: string): EmI
 
 // --- Helpers ---
 
-function filterByPeriod(
-  timelines: TicketTimeline[],
-  ticketMap: Map<string, ProcessedTicket>,
-  period: string,
-): TicketTimeline[] {
-  if (period === 'all') return timelines;
-
-  const periodDays: Record<string, number> = {
-    daily: 1,
-    weekly: 7,
-    'bi-weekly': 14,
-    monthly: 30,
-    quarterly: 90,
-    'half-yearly': 180,
-  };
-  const days = periodDays[period] ?? 30;
+function filterByPeriod(tickets: ProcessedTicket[], weeks: number): ProcessedTicket[] {
+  if (weeks === 0) return tickets;
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - days);
-
-  return timelines.filter(tl => {
-    const ticket = ticketMap.get(tl.key);
-    if (!ticket?.resolved) return false;
-    return new Date(ticket.resolved) >= cutoff;
-  });
+  cutoff.setDate(cutoff.getDate() - weeks * 7);
+  return tickets.filter((t) => t.resolved && new Date(t.resolved) >= cutoff);
 }
 
-function computeCycleTimeDistribution(timelines: TicketTimeline[]): CycleTimeDistribution {
-  const cycleTimes = timelines
-    .map(tl => tl.cycleTimeHours)
-    .filter((h): h is number => h != null);
-
-  const perc = computePercentiles(cycleTimes, [50, 85, 95]);
-
-  // 4-week trend
+function computeCycleTimeTrend(tickets: ProcessedTicket[], timelineMap: Map<string, TicketTimeline>, weeks: number): CycleTimeDistribution['trend'] {
+  const result: CycleTimeDistribution['trend'] = [];
   const now = new Date();
-  const trend: Array<{ week: string; p50: number; p85: number }> = [];
-  for (let w = 3; w >= 0; w--) {
+
+  for (let i = weeks - 1; i >= 0; i--) {
     const weekEnd = new Date(now);
-    weekEnd.setDate(weekEnd.getDate() - w * 7);
+    weekEnd.setDate(weekEnd.getDate() - i * 7);
     const weekStart = new Date(weekEnd);
     weekStart.setDate(weekStart.getDate() - 7);
 
-    const weekLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()}`;
-    const weekCycleTimes = timelines
-      .filter(tl => {
-        if (tl.cycleTimeHours == null) return false;
-        const donePeriod = tl.statusPeriods.find(p => p.category === 'done');
-        if (!donePeriod) return false;
-        const doneDate = new Date(donePeriod.enteredAt);
-        return doneDate >= weekStart && doneDate < weekEnd;
-      })
-      .map(tl => tl.cycleTimeHours!)
-      .filter((h): h is number => h != null);
+    const weekTickets = tickets.filter(t => t.resolved && new Date(t.resolved) >= weekStart && new Date(t.resolved) < weekEnd);
+    const weekTimelines = weekTickets.map(t => timelineMap.get(t.key)).filter(Boolean) as TicketTimeline[];
+    const cycleTimes = weekTimelines.map(tl => tl.cycleTimeHours).filter((h): h is number => h != null);
+    const pct = computePercentiles(cycleTimes);
 
-    const weekPerc = computePercentiles(weekCycleTimes, [50, 85]);
-    trend.push({ week: weekLabel, p50: weekPerc.p50, p85: weekPerc.p85 });
+    result.push({
+      week: `${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
+      p50: pct.p50,
+      p85: pct.p85,
+    });
   }
-
-  return { p50: perc.p50, p85: perc.p85, p95: perc.p95, trend };
+  return result;
 }
 
-function computeWorkStreamThroughput(tickets: ProcessedTicket[]): WorkStreamThroughput[] {
-  const byStream = new Map<string, { count: number; sp: number }>();
-
+function computeThroughputByWorkStream(tickets: ProcessedTicket[]): WorkStreamThroughput[] {
+  const byWs = new Map<string, { count: number; storyPoints: number }>();
   for (const t of tickets) {
-    const ws = t.work_stream ?? 'Unclassified';
-    const entry = byStream.get(ws) ?? { count: 0, sp: 0 };
+    const ws = t.work_stream || 'Other';
+    const entry = byWs.get(ws) || { count: 0, storyPoints: 0 };
     entry.count++;
-    entry.sp += t.story_points ?? 0;
-    byStream.set(ws, entry);
+    entry.storyPoints += t.story_points ?? 0;
+    byWs.set(ws, entry);
   }
+  return Array.from(byWs.entries()).map(([ws, data]) => ({
+    workStream: ws,
+    ...data,
+  })).sort((a, b) => b.count - a.count);
+}
 
-  return Array.from(byStream.entries())
-    .map(([workStream, data]) => ({
-      workStream,
-      count: data.count,
-      storyPoints: data.sp,
-    }))
-    .sort((a, b) => b.count - a.count);
+function computeWeeklyThroughputWithSP(tickets: ProcessedTicket[], timelineMap: Map<string, TicketTimeline>, weeks: number): EmTeamMetricsResponse['weeklyThroughput'] {
+  const result: EmTeamMetricsResponse['weeklyThroughput'] = [];
+  const now = new Date();
+
+  for (let i = weeks - 1; i >= 0; i--) {
+    const weekEnd = new Date(now);
+    weekEnd.setDate(weekEnd.getDate() - i * 7);
+    const weekStart = new Date(weekEnd);
+    weekStart.setDate(weekStart.getDate() - 7);
+
+    const weekTickets = tickets.filter(t => t.resolved && new Date(t.resolved) >= weekStart && new Date(t.resolved) < weekEnd);
+    
+    result.push({
+      week: `${weekStart.getMonth() + 1}/${weekStart.getDate()}`,
+      count: weekTickets.length,
+      storyPoints: weekTickets.reduce((s, t) => s + (t.story_points ?? 0), 0),
+    });
+  }
+  return result;
 }
 
 function computeContributionSpread(tickets: ProcessedTicket[]): ContributionEntry[] {
-  const byAssignee = new Map<string, { displayName: string; sp: number; tickets: number }>();
-
+  const byEng = new Map<string, { displayName: string; sp: number; tickets: number }>();
   for (const t of tickets) {
-    if (!t.assignee_id) continue;
-    const entry = byAssignee.get(t.assignee_id) ?? { displayName: t.assignee, sp: 0, tickets: 0 };
+    const id = t.assignee_id || t.assignee;
+    const entry = byEng.get(id) || { displayName: t.assignee, sp: 0, tickets: 0 };
     entry.sp += t.story_points ?? 0;
     entry.tickets++;
-    byAssignee.set(t.assignee_id, entry);
+    byEng.set(id, entry);
   }
 
-  const values = Array.from(byAssignee.values());
-  const avgSP = values.length > 0 ? values.reduce((sum, e) => sum + e.sp, 0) / values.length : 1;
+  const entries = Array.from(byEng.entries()).map(([id, data]) => ({
+    accountId: id,
+    displayName: data.displayName,
+    storyPoints: data.sp,
+    tickets: data.tickets,
+    normalizedScore: 0, // Computed below
+  }));
 
-  return Array.from(byAssignee.entries())
-    .map(([accountId, data]) => ({
-      accountId,
-      displayName: data.displayName,
-      storyPoints: data.sp,
-      tickets: data.tickets,
-      normalizedScore: avgSP > 0 ? data.sp / avgSP : 0,
-    }))
-    .sort((a, b) => b.storyPoints - a.storyPoints);
+  const avgSp = entries.length > 0 ? entries.reduce((s, e) => s + e.storyPoints, 0) / entries.length : 0;
+  entries.forEach(e => {
+    e.normalizedScore = avgSp > 0 ? (e.storyPoints / avgSp) : 1;
+  });
+
+  return entries.sort((a, b) => b.storyPoints - a.storyPoints);
 }
 
-function computeAgingWip(
-  timelines: TicketTimeline[],
-  ticketMap: Map<string, ProcessedTicket>,
-  thresholds: { warning_days: number; critical_days: number; escalation_days: number },
-): AgingWipEntry[] {
-  const aging: AgingWipEntry[] = [];
+function computeAgingWip(allTickets: ProcessedTicket[], timelineMap: Map<string, TicketTimeline>): AgingWipEntry[] {
+  const activeStatuses = getConfig().active_statuses.map(s => s.toLowerCase());
+  const wip = allTickets.filter(t => activeStatuses.includes(t.status.toLowerCase()));
+  
+  return wip.map(t => {
+    const tl = timelineMap.get(t.key);
+    const days = tl ? tl.daysInCurrentStatus : 0;
+    
+    let severity: AgingWipEntry['severity'] = 'warning';
+    if (days > 14) severity = 'escalation';
+    else if (days > 7) severity = 'critical';
 
-  for (const tl of timelines) {
-    // Only active (non-done) tickets
-    const lastPeriod = tl.statusPeriods[tl.statusPeriods.length - 1];
-    if (!lastPeriod || lastPeriod.category === 'done') continue;
-    if (lastPeriod.category === 'wait') continue; // Skip backlog items
-
-    const days = tl.daysInCurrentStatus;
-    if (days < thresholds.warning_days) continue;
-
-    const ticket = ticketMap.get(tl.key);
-    if (!ticket) continue;
-
-    const severity = days >= thresholds.escalation_days
-      ? 'escalation'
-      : days >= thresholds.critical_days
-        ? 'critical'
-        : 'warning';
-
-    aging.push({
-      key: tl.key,
-      summary: ticket.summary,
-      assignee: ticket.assignee,
-      status: tl.currentStatus,
-      daysInStatus: Math.round(days),
-      storyPoints: ticket.story_points,
+    return {
+      key: t.key,
+      summary: t.summary,
+      assignee: t.assignee,
+      status: t.status,
+      daysInStatus: Math.round(days * 10) / 10,
+      storyPoints: t.story_points,
       severity,
-    });
-  }
-
-  return aging.sort((a, b) => b.daysInStatus - a.daysInStatus);
+    };
+  }).sort((a, b) => b.daysInStatus - a.daysInStatus);
 }
 
 function computeBugRatioByEngineer(tickets: ProcessedTicket[]): EngineerBugRatio[] {
-  const byAssignee = new Map<string, { displayName: string; bugs: number; total: number }>();
-
+  const byEng = new Map<string, { displayName: string; bugs: number; total: number }>();
   for (const t of tickets) {
-    if (!t.assignee_id) continue;
-    const entry = byAssignee.get(t.assignee_id) ?? { displayName: t.assignee, bugs: 0, total: 0 };
+    const id = t.assignee_id || t.assignee;
+    const entry = byEng.get(id) || { displayName: t.assignee, bugs: 0, total: 0 };
     entry.total++;
-    if (BUG_TYPES.has(t.issue_type.toLowerCase())) entry.bugs++;
-    byAssignee.set(t.assignee_id, entry);
+    if (t.issue_type.toLowerCase().includes('bug')) entry.bugs++;
+    byEng.set(id, entry);
   }
 
-  return Array.from(byAssignee.entries())
-    .map(([accountId, data]) => ({
-      accountId,
-      displayName: data.displayName,
-      bugCount: data.bugs,
-      totalCount: data.total,
-      bugRatio: data.total > 0 ? data.bugs / data.total : 0,
-    }))
-    .sort((a, b) => b.bugRatio - a.bugRatio);
+  return Array.from(byEng.entries()).map(([id, data]) => ({
+    accountId: id,
+    displayName: data.displayName,
+    bugCount: data.bugs,
+    totalCount: data.total,
+    bugRatio: (data.bugs / data.total) * 100,
+  })).sort((a, b) => b.bugRatio - a.bugRatio);
 }

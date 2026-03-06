@@ -6,13 +6,13 @@ const apiMethods = [
   'login', 'logout', 'getAuthState', 'resetApp',
   'getConfig', 'saveConfig',
   'getJiraProject', 'getJiraFields', 'getJiraStatuses', 'getJiraMembers',
-  'getTickets', 'updateTicket', 'syncSingleTicket', 'calculateHours', 'calculateFields',
-  'triggerSync', 'syncAllProjects',
+  'getTickets', 'updateTicket', 'syncOneTicket', 'calcTicketFields',
+  'syncFull', 'syncAllProjects',
   'getTeamMetrics', 'getIndividualMetrics',
   'checkForUpdates', 'downloadUpdate',
   'getAiConfig', 'setAiConfig', 'deleteAiConfig', 'testAiConnection', 'getAiSuggestions',
   'listProjects', 'addProject', 'updateProject', 'removeProject', 'syncProject', 'getCrossProjectMetrics',
-  'listEpics', 'getEpicDetail', 'syncEpics',
+  'getEpics', 'getEpicDetail', 'syncEpics',
 ];
 
 for (const method of apiMethods) {
@@ -26,13 +26,13 @@ import {
   login, logout, getAuthState, resetApp,
   getConfig, saveConfig,
   getJiraProject, getJiraFields, getJiraStatuses, getJiraMembers,
-  getTickets, updateTicket, syncSingleTicket, calculateHours, calculateFields,
-  triggerSync, syncAllProjects,
+  getTickets, updateTicket, syncOneTicket, calcTicketFields,
+  syncFull, syncAllProjects,
   getTeamMetrics, getIndividualMetrics,
   checkForUpdates, downloadUpdate,
   getAiConfig, setAiConfig, deleteAiConfig, testAiConnection, getAiSuggestions,
   listProjects, addProject, updateProjectConfig, removeProject, syncProject, getCrossProjectMetrics,
-  listEpics, getEpicDetail, syncEpics,
+  getEpics, getEpicDetail, syncEpics,
 } from '../api';
 
 describe('api wrappers', () => {
@@ -101,31 +101,25 @@ describe('api wrappers', () => {
   });
 
   it('wraps updateTicket', async () => {
-    const res = await updateTicket('T-1', { eng_hours: 5 });
+    const res = await updateTicket('T-1', { tpd_bu: 'B2C' });
     expect(res).toEqual({ data: 'result' });
-    expect(mockApi.updateTicket).toHaveBeenCalledWith('T-1', { eng_hours: 5 });
+    expect(mockApi.updateTicket).toHaveBeenCalledWith('T-1', { tpd_bu: 'B2C' });
   });
 
-  it('wraps syncSingleTicket', async () => {
-    const res = await syncSingleTicket('T-1');
+  it('wraps syncOneTicket', async () => {
+    const res = await syncOneTicket('T-1');
     expect(res).toEqual({ data: 'result' });
-    expect(mockApi.syncSingleTicket).toHaveBeenCalledWith('T-1');
+    expect(mockApi.syncOneTicket).toHaveBeenCalledWith('T-1');
   });
 
-  it('wraps calculateHours', async () => {
-    const res = await calculateHours('T-1');
+  it('wraps calcTicketFields', async () => {
+    const res = await calcTicketFields('T-1');
     expect(res).toEqual({ data: 'result' });
-    expect(mockApi.calculateHours).toHaveBeenCalledWith('T-1');
+    expect(mockApi.calcTicketFields).toHaveBeenCalledWith('T-1');
   });
 
-  it('wraps calculateFields', async () => {
-    const res = await calculateFields('T-1');
-    expect(res).toEqual({ data: 'result' });
-    expect(mockApi.calculateFields).toHaveBeenCalledWith('T-1');
-  });
-
-  it('wraps triggerSync', async () => {
-    const res = await triggerSync();
+  it('wraps syncFull', async () => {
+    const res = await syncFull();
     expect(res).toEqual({ data: 'result' });
   });
 
@@ -196,10 +190,10 @@ describe('api wrappers', () => {
     expect(mockApi.getTickets).toHaveBeenCalledWith('PROJ');
   });
 
-  it('wraps triggerSync with optional projectKey', async () => {
-    const res = await triggerSync('PROJ');
+  it('wraps syncFull with optional projectKey', async () => {
+    const res = await syncFull('PROJ');
     expect(res).toEqual({ data: 'result' });
-    expect(mockApi.triggerSync).toHaveBeenCalledWith('PROJ');
+    expect(mockApi.syncFull).toHaveBeenCalledWith('PROJ');
   });
 
   it('wraps getTeamMetrics with projectKey', async () => {
@@ -225,9 +219,9 @@ describe('api wrappers', () => {
   });
 
   it('wraps updateProjectConfig', async () => {
-    const res = await updateProjectConfig('PROJ', { eng_start_status: 'Dev' });
+    const res = await updateProjectConfig('PROJ', { project_name: 'Dev' });
     expect(res).toEqual({ data: 'result' });
-    expect(mockApi.updateProject).toHaveBeenCalledWith('PROJ', { eng_start_status: 'Dev' });
+    expect(mockApi.updateProject).toHaveBeenCalledWith('PROJ', { project_name: 'Dev' });
   });
 
   it('wraps removeProject', async () => {
@@ -248,10 +242,10 @@ describe('api wrappers', () => {
     expect(mockApi.getCrossProjectMetrics).toHaveBeenCalledWith('monthly');
   });
 
-  it('wraps listEpics with optional projectKey', async () => {
-    const res = await listEpics('PROJ');
+  it('wraps getEpics with optional projectKey', async () => {
+    const res = await getEpics('PROJ');
     expect(res).toEqual({ data: 'result' });
-    expect(mockApi.listEpics).toHaveBeenCalledWith('PROJ');
+    expect(mockApi.getEpics).toHaveBeenCalledWith('PROJ');
   });
 
   it('wraps getEpicDetail with optional projectKey', async () => {

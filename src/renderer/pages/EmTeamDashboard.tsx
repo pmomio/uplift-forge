@@ -104,7 +104,7 @@ const TOOLTIPS = {
     target: '80-120% is healthy. <60% = over-estimating. >150% = under-estimating.',
     trendUp: 'Estimates becoming less accurate — team under-estimating more',
     trendDown: 'Estimates improving — actual work converging toward estimates',
-    derivation: 'Data source: JIRA story_points + computed engineering hours (from field-engine).\nComputation: Per ticket: accuracy = (actual_eng_hours ÷ (story_points × sp_to_days × 8)) × 100. Team average across all tickets that have both SP and eng hours.\nFilters: Only resolved tickets with story_points > 0 and computed eng hours > 0. Period and project filters.\nConfig dependency: sp_to_days, eng_start_status, eng_end_status, office_hours, field_ids.story_points.',
+    derivation: 'Data source: JIRA story_points + computed active time (from history).\nComputation: Per ticket: accuracy = (active_time_hours ÷ (story_points × sp_to_days × 8)) × 100. Team average across all tickets that have both SP and active time.\nFilters: Only resolved tickets with story_points > 0 and computed active time > 0. Period and project filters.\nConfig dependency: sp_to_days, active_statuses, field_ids.story_points.',
   },
   firstTimePassRate: {
     description: 'Percentage of tickets completed without any backward status transitions.',

@@ -82,16 +82,19 @@ export function registerIpcHandlers(): void {
     // Check if additional projects were added/changed
     const projectsChanged = payload.projects != null;
     const needsSync = projectKeyChanged || filterChanged;
+    
+    let totalSynced = 0;
     if (needsSync || projectsChanged) {
-      await ticketService.syncAllProjects();
+      const syncResults = await ticketService.syncAllProjects();
+      totalSynced = Object.values(syncResults).reduce((sum, count) => sum + count, 0);
     }
 
     if (rulesChanged && !needsSync && !projectsChanged) {
       ticketService.reprocessCache();
     }
 
-    const visible = ticketService.getVisibleTicketCount();
-    return { status: 'success', sync_triggered: needsSync, ticket_count: visible };
+    const ticketCount = (needsSync || projectsChanged) ? totalSynced : ticketService.getVisibleTicketCount();
+    return { status: 'success', sync_triggered: needsSync || projectsChanged, ticket_count: ticketCount };
   });
 
   // ----- JIRA metadata -----
@@ -126,18 +129,19 @@ export function registerIpcHandlers(): void {
     return ticketService.syncSingleTicket(key);
   });
 
-  ipcMain.handle(Channels.TICKETS_CALC_HOURS, async (_event, key: string) => {
-    return ticketService.calculateTicketHours(key);
-  });
-
   ipcMain.handle(Channels.TICKETS_CALC_FIELDS, async (_event, key: string) => {
     return ticketService.calculateTicketFields(key);
   });
 
   // ----- Sync -----
   ipcMain.handle(Channels.SYNC_FULL, async (_event, projectKey?: string) => {
-    const count = await ticketService.syncTickets(projectKey);
-    return { status: 'success', count };
+    try {
+      const count = await ticketService.syncTickets(projectKey);
+      return { status: 'success', count };
+    } catch (e) {
+      console.error('[Sync] Full sync failed:', e);
+      throw e;
+    }
   });
 
   // ----- Metrics -----
@@ -186,8 +190,13 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(Channels.PROJECT_REMOVE, (_event, projectKey: string) => projectService.removeProject(projectKey));
 
   ipcMain.handle(Channels.PROJECT_SYNC, async (_event, projectKey: string) => {
-    const count = await projectService.syncProject(projectKey);
-    return { status: 'success', count };
+    try {
+      const count = await projectService.syncProject(projectKey);
+      return { status: 'success', count };
+    } catch (e) {
+      console.error('[Sync] Project sync failed:', e);
+      throw e;
+    }
   });
 
   ipcMain.handle(Channels.METRICS_CROSS_PROJECT, (_event, period: string) =>
@@ -195,8 +204,13 @@ export function registerIpcHandlers(): void {
 
   // ----- Sync All Projects -----
   ipcMain.handle(Channels.SYNC_ALL_PROJECTS, async () => {
-    const results = await ticketService.syncAllProjects();
-    return { status: 'success', results };
+    try {
+      const results = await ticketService.syncAllProjects();
+      return { status: 'success', results };
+    } catch (e) {
+      console.error('[Sync] All projects sync failed:', e);
+      throw e;
+    }
   });
 
   // ----- Epics -----
@@ -205,12 +219,17 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(Channels.EPIC_DETAIL, (_event, epicKey: string, projectKey?: string) => epicService.getEpicDetail(epicKey, projectKey));
 
   ipcMain.handle(Channels.EPICS_SYNC, async (_event, projectKey?: string) => {
-    if (projectKey) {
-      await ticketService.syncTickets(projectKey);
-    } else {
-      await ticketService.syncAllProjects();
+    try {
+      if (projectKey) {
+        await ticketService.syncTickets(projectKey);
+      } else {
+        await ticketService.syncAllProjects();
+      }
+      return epicService.getEpicSummaries(projectKey);
+    } catch (e) {
+      console.error('[Sync] Epics sync failed:', e);
+      throw e;
     }
-    return epicService.getEpicSummaries(projectKey);
   });
 
   // ----- Timeline -----
