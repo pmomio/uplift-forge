@@ -69,6 +69,30 @@ test.describe('Login Page', () => {
     await expect(window.locator('text=Welcome to Uplift Forge')).toBeVisible({ timeout: 15_000 });
   });
 
+  test('invalid JIRA credentials show error', async ({ window, jiraMock }) => {
+    await window.waitForSelector('text=Connect & Continue', { timeout: 15_000 });
+
+    // Mock 401 for /myself
+    jiraMock.mockRoute('/rest/api/3/myself', 401, { errorMessages: ['Unauthorized'] });
+
+    // Fill login form
+    await window.fill('input[placeholder*="your-org.atlassian.net"]', jiraMock.baseUrl);
+    await window.fill('input[placeholder*="you@example.com"]', 'bad@example.com');
+    await window.fill('input[placeholder*="API token"]', 'bad-token');
+
+    // Toggle consent
+    const consentBtn = window.locator('button').filter({ has: window.locator('svg.lucide-check') }).first();
+    await consentBtn.click();
+
+    // Submit
+    await window.click('text=Connect & Continue');
+
+    // Should show error message
+    await expect(window.locator('text=JIRA API error 401')).toBeVisible({ timeout: 15_000 });
+    // Should NOT navigate to onboarding
+    await expect(window.locator('text=Welcome to Uplift Forge')).not.toBeVisible();
+  });
+
   test('Enter key submits form when consent is checked', async ({ window, jiraMock }) => {
     await window.waitForSelector('text=Connect & Continue', { timeout: 15_000 });
 

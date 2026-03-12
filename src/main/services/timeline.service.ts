@@ -6,8 +6,7 @@ import type { StatusPeriod, TicketTimeline, StatusClassification, ProcessedTicke
  * Timeline Engine — extracts status periods, cycle/lead time, rework,
  * and flow efficiency from raw JIRA changelogs.
  *
- * Uses calendar time (not office hours). The existing
- * calculateEngineeringHours() in field-engine continues to use office hours.
+ * Uses calendar time.
  */
 
 // Per-project timeline caches
@@ -329,8 +328,8 @@ function getTimelinesForProject(
 // --- Shared metric helpers (used by multiple persona services) ---
 
 /**
- * Compute SP estimation accuracy: avg ratio of actual eng_hours to estimated hours (SP × spToDays × 8).
- * Returns value where 100 = perfect. null if no tickets have both SP and eng_hours.
+ * Compute SP estimation accuracy: avg ratio of active time to estimated hours (SP × spToDays × 8).
+ * Returns value where 100 = perfect. null if no tickets have both SP and active time.
  */
 export function computeSpAccuracy(
   tickets: ProcessedTicket[],
@@ -342,10 +341,12 @@ export function computeSpAccuracy(
 
   for (const t of tickets) {
     if (t.story_points == null || t.story_points <= 0) continue;
-    if (t.eng_hours == null || t.eng_hours <= 0) continue;
+    const tl = timelineMap.get(t.key);
+    if (!tl || tl.activeTimeHours <= 0) continue;
+    
     const estimated = t.story_points * spToDays * 8;
     if (estimated <= 0) continue;
-    ratios.push((t.eng_hours / estimated) * 100);
+    ratios.push((tl.activeTimeHours / estimated) * 100);
   }
 
   if (ratios.length === 0) return null;

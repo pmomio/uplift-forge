@@ -76,7 +76,7 @@ export function getAuthHeader(): string | null {
 
 export function clearCredentials(): void {
   cachedCredentials = null;
-  tokenStore.set('credentials', null);
+  tokenStore.clear();
   emitAuthStateChanged();
 }
 

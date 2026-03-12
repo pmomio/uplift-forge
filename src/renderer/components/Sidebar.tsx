@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Settings, BarChart3, Home, TrendingUp, Users, LogOut, Info, ClipboardList } from 'lucide-react';
+import { Settings, Home, TrendingUp, Users, LogOut, Info, ClipboardList } from 'lucide-react';
 import type { ProjectInfo } from '../App';
 import type { Persona } from '../../shared/types';
 import { checkForUpdates } from '../api';
@@ -13,7 +13,6 @@ export interface Tab {
 
 export const ALL_TABS: Tab[] = [
   { id: 'home', label: 'Home', icon: <Home size={18} /> },
-  { id: 'attribution', label: 'Eng. Attribution', icon: <BarChart3 size={18} /> },
   { id: 'metrics', label: 'Team Metrics', icon: <TrendingUp size={18} /> },
   { id: 'individual', label: 'Individual Metrics', icon: <Users size={18} /> },
   { id: 'epics', label: 'Epic Tracker', icon: <ClipboardList size={18} /> },
@@ -22,10 +21,10 @@ export const ALL_TABS: Tab[] = [
 
 /** Tab visibility by persona — strict isolation, no cross-persona visibility */
 const TAB_VISIBILITY: Record<Persona, Set<string>> = {
-  engineering_manager: new Set(['home', 'attribution', 'metrics', 'individual', 'epics', 'config']),
+  engineering_manager: new Set(['home', 'metrics', 'individual', 'epics', 'config']),
   individual: new Set(['home', 'individual', 'config']),
-  delivery_manager: new Set(['home', 'metrics', 'epics', 'attribution', 'config']),
-  management: new Set(['home', 'attribution', 'metrics', 'epics', 'config']),
+  delivery_manager: new Set(['home', 'metrics', 'epics', 'config']),
+  management: new Set(['home', 'metrics', 'epics', 'config']),
 };
 
 // Backward compatible export for tests

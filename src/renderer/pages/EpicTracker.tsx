@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, AlertTriangle, CheckCircle, Clock, ChevronDown, ChevronRight, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { listEpics, syncEpics, getAiConfig, getAiSuggestions, syncAllProjects } from '../api';
+import { getEpics, syncEpics, getAiConfig, getAiSuggestions, syncAllProjects } from '../api';
 import type { ProjectInfo } from '../App';
 import type { EpicSummary, AiProvider, Persona } from '../../shared/types';
 
@@ -32,7 +32,7 @@ const EpicTracker: React.FC<EpicTrackerProps> = ({ refreshKey, project, persona,
   const fetchEpics = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await listEpics();
+      const res = await getEpics();
       setEpics(res.data as EpicSummary[]);
     } catch {
       console.error('Failed to fetch epics');
@@ -46,7 +46,7 @@ const EpicTracker: React.FC<EpicTrackerProps> = ({ refreshKey, project, persona,
     try {
       if (isMultiProject) {
         await syncAllProjects();
-        const res = await listEpics();
+        const res = await getEpics();
         setEpics(res.data as EpicSummary[]);
       } else {
         const res = await syncEpics();

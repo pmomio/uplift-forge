@@ -151,7 +151,7 @@ npm run publish        # 🚀 Publish to GitHub Releases
 
 ### 🕐 Timeline Engine
 
-Separate from engineering hours (office-hours-based), the Timeline Engine in `timeline.service.ts` extracts richer flow data from JIRA changelogs using **calendar time**:
+Separate from legacy manual field mapping, the Timeline Engine in `timeline.service.ts` extracts richer flow data from JIRA changelogs using **calendar time**:
 
 - 📊 **Status Periods** — every period a ticket spent in each status, with duration and category
 - ⏱️ **Cycle Time** — first active status to done (calendar hours)
@@ -162,24 +162,8 @@ Separate from engineering hours (office-hours-based), the Timeline Engine in `ti
 
 Status classification is configurable: Active Statuses, Blocked Statuses, Done Statuses.
 
-### ⏱️ Engineering Hours Calculation
-
-State machine in `field-engine.service.ts:calculateEngineeringHours()`:
-
-- **States**: `idle` → `active` → `blocked` → `active` → `idle`
-- 🔄 Tracks ALL active development periods across multiple start→end cycles
-- 🔁 Tickets can bounce between statuses (rework, multiple developers) — total hours accumulate
-- ⏸️ Excluded statuses (e.g. "Blocked") pause the clock
-- 🌍 Office hours: timezone-aware, weekday-only, configurable start/end times
-- ⚠️ **Known pitfall**: JIRA's `toString` changelog property collides with `Object.prototype.toString`. Must use bracket notation + typeof check (see `getStatusTo()` helper)
-- ✅ **No matching statuses → 0 hours**: If a ticket never enters the configured start/end statuses (e.g. Todo → Rejected), returns `0` instead of `null`. Only non-array input returns `null`.
-
 ### ⚙️ Config Defaults
 
-- `eng_start_status`: "In Progress"
-- `eng_end_status`: "In Review"
-- `eng_excluded_statuses`: ["Blocked"]
-- `office_hours`: 09:00–18:00 Europe/Berlin, weekends excluded
 - `sp_to_days`: 1 (story point = 1 day = 8 hours for estimation accuracy)
 - `active_statuses`: ["In Progress", "Code Review", "QA"]
 - `blocked_statuses`: ["Blocked"]
@@ -195,7 +179,7 @@ State machine in `field-engine.service.ts:calculateEngineeringHours()`:
 - Aging WIP (warning/critical/escalation tiers)
 - Bug ratio by engineer
 - Rework rate
-- 🎯 SP estimation accuracy (actual eng hours vs estimated SP × sp_to_days × 8h)
+- 🎯 SP estimation accuracy (active time from history vs estimated SP × sp_to_days × 8h)
 - ✅ First-time pass rate (complement of rework rate)
 - ⏱️ Avg code review duration (time in review statuses)
 - 📊 Work type distribution (horizontal bar by issue type)
@@ -354,6 +338,8 @@ The `epic.service.ts` generates human-readable `riskFactors[]` strings for each 
 
 All renderer↔main communication uses typed IPC channels defined in `shared/channels.ts`. The renderer's `api.ts` wraps IPC calls in `{ data }` to match Axios response shape. The preload script (`preload.ts`) exposes `window.api` via `contextBridge`.
 
+**🔐 Credential Verification**: The `AUTH_LOGIN` channel performs real-time verification of JIRA credentials by calling the `/myself` endpoint before saving them to the secure store. This ensures invalid API tokens are caught during the login phase.
+
 **Persona-specific metric channels** (with persona guards):
 - `METRICS_EM_TEAM` → `getEmTeamMetrics(period, projectKey?)` — EM only
 - `METRICS_EM_INDIVIDUAL` → `getEmIndividualMetrics(period, projectKey?)` — EM only
@@ -392,14 +378,14 @@ Both credential stores follow the same isolation pattern:
 - 🎭 Main service tests mock `electron-store` and `getConfig()` via `vi.mock()`
 - 🌐 Renderer tests use jsdom + Testing Library, mock `window.api` globally
 - 📊 Coverage thresholds: statements 90%, branches 80%, functions 85%, lines 90%
-- ✅ 672 tests across 33 test suites
+- ✅ 675 tests across 33 test suites
 
 ### 🎭 E2E Tests (Playwright + Electron)
 - 🔌 Launches the **real packaged app** (`out/Uplift Forge-darwin-arm64/`) per test
 - 💾 Each test gets an **isolated `--user-data-dir`** temp directory (auto-cleaned)
 - 🔗 JIRA API calls hit a **local HTTP mock server** — zero app code changes needed
 - 📡 Tests exercise the **full IPC chain**: renderer → preload → ipcMain → services → back
-- 🧪 ~53 tests across 9 spec files covering: login, onboarding, navigation, settings, attribution, team metrics, individual metrics, epic tracker, logout/reset
+- 🧪 ~54 tests across 9 spec files covering: login (incl. invalid credentials), onboarding, navigation, settings, attribution, team metrics, individual metrics, epic tracker, logout/reset
 - 🏗️ Global setup auto-packages the app if stale (`npx electron-forge package`)
 
 ### 📋 Test Files

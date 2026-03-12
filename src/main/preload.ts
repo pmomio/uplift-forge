@@ -6,22 +6,17 @@ import { Channels } from '../shared/channels.js';
  */
 const api = {
   // Auth
-  login: (baseUrl: string, email: string, apiToken: string) =>
-    ipcRenderer.invoke(Channels.AUTH_LOGIN, baseUrl, email, apiToken),
+  login: (baseUrl: string, email: string, apiToken: string) => ipcRenderer.invoke(Channels.AUTH_LOGIN, baseUrl, email, apiToken),
+  demoLogin: () => ipcRenderer.invoke(Channels.AUTH_DEMO),
   logout: () => ipcRenderer.invoke(Channels.AUTH_LOGOUT),
   getAuthState: () => ipcRenderer.invoke(Channels.AUTH_STATE),
   resetApp: () => ipcRenderer.invoke(Channels.AUTH_RESET),
-  onAuthStateChanged: (callback: (state: unknown) => void) => {
-    const listener = (_event: unknown, state: unknown) => callback(state);
-    ipcRenderer.on(Channels.AUTH_STATE_CHANGED, listener);
-    return () => ipcRenderer.removeListener(Channels.AUTH_STATE_CHANGED, listener);
-  },
 
   // Config
   getConfig: () => ipcRenderer.invoke(Channels.CONFIG_GET),
-  saveConfig: (config: unknown) => ipcRenderer.invoke(Channels.CONFIG_SAVE, config),
+  saveConfig: (payload: any) => ipcRenderer.invoke(Channels.CONFIG_SAVE, payload),
 
-  // JIRA metadata
+  // JIRA Metadata
   getJiraProject: () => ipcRenderer.invoke(Channels.JIRA_PROJECT),
   getJiraFields: () => ipcRenderer.invoke(Channels.JIRA_FIELDS),
   getJiraStatuses: () => ipcRenderer.invoke(Channels.JIRA_STATUSES),
@@ -29,18 +24,20 @@ const api = {
 
   // Tickets
   getTickets: (projectKey?: string) => ipcRenderer.invoke(Channels.TICKETS_LIST, projectKey),
-  updateTicket: (key: string, fields: unknown) => ipcRenderer.invoke(Channels.TICKETS_UPDATE, key, fields),
-  syncSingleTicket: (key: string) => ipcRenderer.invoke(Channels.TICKETS_SYNC_ONE, key),
-  calculateHours: (key: string) => ipcRenderer.invoke(Channels.TICKETS_CALC_HOURS, key),
-  calculateFields: (key: string) => ipcRenderer.invoke(Channels.TICKETS_CALC_FIELDS, key),
+  updateTicket: (key: string, fields: any) => ipcRenderer.invoke(Channels.TICKETS_UPDATE, key, fields),
+  syncOneTicket: (key: string) => ipcRenderer.invoke(Channels.TICKETS_SYNC_ONE, key),
 
   // Sync
-  triggerSync: (projectKey?: string) => ipcRenderer.invoke(Channels.SYNC_FULL, projectKey),
+  syncFull: (projectKey?: string) => ipcRenderer.invoke(Channels.SYNC_FULL, projectKey),
   syncAllProjects: () => ipcRenderer.invoke(Channels.SYNC_ALL_PROJECTS),
 
-  // Metrics
-  getTeamMetrics: (period: string, projectKey?: string) => ipcRenderer.invoke(Channels.METRICS_TEAM, period, projectKey),
-  getIndividualMetrics: (period: string, projectKey?: string) => ipcRenderer.invoke(Channels.METRICS_INDIVIDUAL, period, projectKey),
+  // Epics
+  getEpics: (projectKey?: string) => ipcRenderer.invoke(Channels.EPICS_LIST, projectKey),
+  getEpicDetail: (epicKey: string, projectKey?: string) => ipcRenderer.invoke(Channels.EPIC_DETAIL, epicKey, projectKey),
+  syncEpics: (projectKey?: string) => ipcRenderer.invoke(Channels.EPICS_SYNC, projectKey),
+
+  // Timelines
+  getTimelines: (projectKey?: string) => ipcRenderer.invoke(Channels.TIMELINE_LIST, projectKey),
 
   // Shell
   openExternal: (url: string) => ipcRenderer.invoke(Channels.OPEN_EXTERNAL, url),
@@ -48,34 +45,21 @@ const api = {
   // Update
   checkForUpdates: () => ipcRenderer.invoke(Channels.UPDATE_CHECK),
   downloadUpdate: () => ipcRenderer.invoke(Channels.UPDATE_DOWNLOAD),
-  onUpdateStatus: (callback: (info: unknown) => void) => {
-    const listener = (_event: unknown, info: unknown) => callback(info);
-    ipcRenderer.on(Channels.UPDATE_STATUS, listener);
-    return () => ipcRenderer.removeListener(Channels.UPDATE_STATUS, listener);
-  },
 
-  // AI Suggestions
+  // AI
   getAiConfig: () => ipcRenderer.invoke(Channels.AI_CONFIG_GET),
   setAiConfig: (provider: string, apiKey: string) => ipcRenderer.invoke(Channels.AI_CONFIG_SET, provider, apiKey),
   deleteAiConfig: () => ipcRenderer.invoke(Channels.AI_CONFIG_DELETE),
   testAiConnection: () => ipcRenderer.invoke(Channels.AI_CONFIG_TEST),
-  getAiSuggestions: (req: unknown) => ipcRenderer.invoke(Channels.AI_SUGGEST, req),
+  getAiSuggestions: (req: any) => ipcRenderer.invoke(Channels.AI_SUGGEST, req),
 
-  // Multi-Project
+  // Multi-project
   listProjects: () => ipcRenderer.invoke(Channels.PROJECT_LIST),
-  addProject: (project: unknown) => ipcRenderer.invoke(Channels.PROJECT_ADD, project),
-  updateProject: (projectKey: string, updates: unknown) => ipcRenderer.invoke(Channels.PROJECT_UPDATE, projectKey, updates),
+  addProject: (project: any) => ipcRenderer.invoke(Channels.PROJECT_ADD, project),
+  updateProject: (projectKey: string, updates: any) => ipcRenderer.invoke(Channels.PROJECT_UPDATE, projectKey, updates),
   removeProject: (projectKey: string) => ipcRenderer.invoke(Channels.PROJECT_REMOVE, projectKey),
   syncProject: (projectKey: string) => ipcRenderer.invoke(Channels.PROJECT_SYNC, projectKey),
   getCrossProjectMetrics: (period: string) => ipcRenderer.invoke(Channels.METRICS_CROSS_PROJECT, period),
-
-  // Epics
-  listEpics: (projectKey?: string) => ipcRenderer.invoke(Channels.EPICS_LIST, projectKey),
-  getEpicDetail: (epicKey: string, projectKey?: string) => ipcRenderer.invoke(Channels.EPIC_DETAIL, epicKey, projectKey),
-  syncEpics: (projectKey?: string) => ipcRenderer.invoke(Channels.EPICS_SYNC, projectKey),
-
-  // Timeline
-  getTimelines: (projectKey?: string) => ipcRenderer.invoke(Channels.TIMELINE_LIST, projectKey),
 
   // Persona-specific metrics
   getEmTeamMetrics: (period: string, projectKey?: string) => ipcRenderer.invoke(Channels.METRICS_EM_TEAM, period, projectKey),

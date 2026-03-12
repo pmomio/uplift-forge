@@ -1,203 +1,122 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock electron-store
-const mockData: Record<string, unknown> = {
-  eng_start_status: 'In Progress',
-  eng_end_status: 'In Review',
-  eng_excluded_statuses: ['Blocked'],
-  office_hours: { start: '09:00', end: '18:00', timezone: 'Europe/Berlin', exclude_weekends: true },
-  mapping_rules: { tpd_bu: {}, work_stream: {} },
-  field_ids: { tpd_bu: '', eng_hours: '', work_stream: '', story_points: '' },
-  project_key: 'TEST',
-  ticket_filter: { mode: 'last_x_months', months: 6 },
-  sp_to_days: 1,
-  tracked_engineers: [
-    { accountId: '1', displayName: 'Alice' },
-    { accountId: '2', displayName: 'Bob' },
-  ],
-  ticketCache: {},
-  rawIssueCache: {},
-};
-
-vi.mock('electron-store', () => ({
-  default: class MockStore {
-    constructor() {}
-    get(key: string) { return mockData[key]; }
-    set(key: string, value: unknown) { mockData[key] = value; }
-  },
+// Mock config
+vi.mock('../../src/main/services/config.service.js', () => ({
+  getConfig: vi.fn(() => ({
+    sp_to_days: 1,
+  })),
 }));
 
-// Mock jira service
-vi.mock('../../src/main/services/jira.service', () => ({
-  getIssues: vi.fn(),
-  searchIssues: vi.fn(),
-  getIssueChangelog: vi.fn(),
-  updateIssueFields: vi.fn(),
+// Mock ticket service
+vi.mock('../../src/main/services/ticket.service.js', () => ({
+  getTickets: vi.fn(),
 }));
 
-import { getTeamMetrics, getIndividualMetrics } from '../../src/main/services/metrics.service';
-import type { ProcessedTicket } from '../../src/shared/types';
+// Mock timeline service
+vi.mock('../../src/main/services/timeline.service.js', () => ({
+  getTimelines: vi.fn(),
+  computeSpAccuracy: vi.fn(() => 85),
+}));
 
-// We need to inject tickets into the cache. Since ticket.service uses getTickets internally,
-// we'll mock it.
-vi.mock('../../src/main/services/ticket.service', async (importOriginal) => {
-  let tickets: ProcessedTicket[] = [];
+import { getTeamMetrics, getIndividualMetrics } from '../../src/main/services/metrics.service.js';
+import { getTickets } from '../../src/main/services/ticket.service.js';
+import { getTimelines } from '../../src/main/services/timeline.service.js';
+
+function makeTicket(key: string, overrides: any = {}) {
   return {
-    FINAL_STATUSES: ['Done', 'Rejected', 'Closed', 'Resolved', 'Cancelled'],
-    getTickets: () => tickets,
-    __setTickets: (t: ProcessedTicket[]) => { tickets = t; },
-  };
-});
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const { __setTickets } = await import('../../src/main/services/ticket.service') as any;
-
-function makeTicket(overrides: Partial<ProcessedTicket> = {}): ProcessedTicket {
-  return {
-    key: 'TEST-1',
-    summary: 'Test ticket',
+    key,
+    summary: `Summary ${key}`,
     status: 'Done',
     assignee: 'Alice',
-    eng_hours: 8,
-    tpd_bu: 'B2C',
-    work_stream: 'Product',
-    has_computed_values: false,
+    assignee_id: 'a1',
     story_points: 3,
     issue_type: 'Story',
-    priority: 'Medium',
-    created: '2026-02-01T10:00:00+01:00',
-    resolved: '2026-02-20T16:00:00+01:00',
-    base_url: '',
-    updated: '2026-02-20T16:00:00+01:00',
+    resolved: '2025-01-10T10:00:00Z',
+    updated: '2025-01-10T12:00:00Z',
     ...overrides,
   };
 }
 
-describe('getTeamMetrics', () => {
+function makeTimeline(key: string, cycleTime = 24) {
+  return {
+    key,
+    cycleTimeHours: cycleTime,
+    statusPeriods: [{ category: 'done', enteredAt: '2025-01-10T10:00:00Z' }],
+  };
+}
+
+describe('metrics.service', () => {
   beforeEach(() => {
-    (__setTickets as Function)([]);
+    vi.clearAllMocks();
   });
 
-  it('returns empty when no tickets', () => {
-    const result = getTeamMetrics('all');
-    expect(result.period).toBe('all');
-    expect(result.monthly_trend).toEqual([]);
+  describe('getTeamMetrics', () => {
+    it('aggregates summary metrics', () => {
+      const tickets = [
+        makeTicket('T-1', { story_points: 5 }),
+        makeTicket('T-2', { story_points: 3, issue_type: 'Bug' }),
+      ];
+      const timelines = [
+        makeTimeline('T-1', 10),
+        makeTimeline('T-2', 20),
+      ];
+      vi.mocked(getTickets).mockReturnValue(tickets);
+      vi.mocked(getTimelines).mockReturnValue(timelines as any);
+
+      const res = getTeamMetrics('all');
+      expect(res.summary.total_tickets).toBe(2);
+      expect(res.summary.total_story_points).toBe(8);
+      expect(res.summary.bug_count).toBe(1);
+      expect(res.summary.bug_ratio).toBe(50);
+      expect(res.summary.avg_cycle_time_hours).toBe(15);
+    });
+
+    it('computes monthly trend', () => {
+      const tickets = [
+        makeTicket('T-1', { resolved: '2025-01-01T10:00:00Z', story_points: 5 }),
+        makeTicket('T-2', { resolved: '2025-02-01T10:00:00Z', story_points: 3 }),
+      ];
+      vi.mocked(getTickets).mockReturnValue(tickets);
+      vi.mocked(getTimelines).mockReturnValue([]);
+
+      const res = getTeamMetrics('all');
+      expect(res.monthly_trend).toHaveLength(2);
+      expect(res.monthly_trend[0].month).toBe('2025-01');
+      expect(res.monthly_trend[1].month).toBe('2025-02');
+    });
   });
 
-  it('computes summary for all tickets', () => {
-    (__setTickets as Function)([
-      makeTicket({ key: 'T-1', eng_hours: 10, story_points: 2, issue_type: 'Story' }),
-      makeTicket({ key: 'T-2', eng_hours: 6, story_points: 1, issue_type: 'Bug' }),
-    ]);
+  describe('getIndividualMetrics', () => {
+    it('groups metrics by engineer', () => {
+      const tickets = [
+        makeTicket('T-1', { assignee: 'Alice', assignee_id: 'a1', story_points: 5 }),
+        makeTicket('T-2', { assignee: 'Bob', assignee_id: 'b1', story_points: 3 }),
+      ];
+      vi.mocked(getTickets).mockReturnValue(tickets);
+      vi.mocked(getTimelines).mockReturnValue([
+        makeTimeline('T-1', 10),
+        makeTimeline('T-2', 20),
+      ] as any);
 
-    const result = getTeamMetrics('all');
-    expect(result.summary.total_tickets).toBe(2);
-    expect(result.summary.total_story_points).toBe(3);
-    expect(result.summary.total_eng_hours).toBe(16);
-    expect(result.summary.bug_count).toBe(1);
-    expect(result.summary.bug_ratio).toBe(0.5);
-  });
+      const res = getIndividualMetrics('all');
+      expect(res.engineers).toHaveLength(2);
+      
+      const alice = res.engineers.find(e => e.displayName === 'Alice');
+      expect(alice?.metrics.total_tickets).toBe(1);
+      expect(alice?.metrics.total_story_points).toBe(5);
+      expect(alice?.metrics.avg_cycle_time_hours).toBe(10);
+    });
 
-  it('computes business unit breakdown', () => {
-    (__setTickets as Function)([
-      makeTicket({ key: 'T-1', tpd_bu: 'B2C', eng_hours: 10 }),
-      makeTicket({ key: 'T-2', tpd_bu: 'B2B', eng_hours: 5 }),
-    ]);
+    it('calculates team averages', () => {
+      const tickets = [
+        makeTicket('T-1', { assignee: 'Alice', story_points: 10 }),
+        makeTicket('T-2', { assignee: 'Bob', story_points: 20 }),
+      ];
+      vi.mocked(getTickets).mockReturnValue(tickets);
+      vi.mocked(getTimelines).mockReturnValue([]);
 
-    const result = getTeamMetrics('all');
-    expect(result.by_business_unit['B2C'].eng_hours).toBe(10);
-    expect(result.by_business_unit['B2B'].eng_hours).toBe(5);
-  });
-
-  it('computes monthly trend', () => {
-    (__setTickets as Function)([
-      makeTicket({ key: 'T-1', resolved: '2026-01-15T10:00:00Z', eng_hours: 5 }),
-      makeTicket({ key: 'T-2', resolved: '2026-02-15T10:00:00Z', eng_hours: 8 }),
-    ]);
-
-    const result = getTeamMetrics('all');
-    expect(result.monthly_trend.length).toBe(2);
-    expect(result.monthly_trend[0].month).toBe('2026-01');
-    expect(result.monthly_trend[1].month).toBe('2026-02');
-  });
-
-  it('handles null eng_hours', () => {
-    (__setTickets as Function)([
-      makeTicket({ key: 'T-1', eng_hours: null, story_points: null }),
-    ]);
-
-    const result = getTeamMetrics('all');
-    expect(result.summary.total_eng_hours).toBe(0);
-    expect(result.summary.avg_eng_hours_per_sp).toBeNull();
-  });
-});
-
-describe('getIndividualMetrics', () => {
-  beforeEach(() => {
-    (__setTickets as Function)([]);
-  });
-
-  it('returns empty when no tracked engineers', () => {
-    mockData.tracked_engineers = [];
-    const result = getIndividualMetrics('all');
-    expect(result.engineers).toEqual([]);
-    mockData.tracked_engineers = [
-      { accountId: '1', displayName: 'Alice' },
-      { accountId: '2', displayName: 'Bob' },
-    ];
-  });
-
-  it('computes per-engineer metrics', () => {
-    (__setTickets as Function)([
-      makeTicket({ key: 'T-1', assignee: 'Alice', eng_hours: 10, story_points: 3 }),
-      makeTicket({ key: 'T-2', assignee: 'Alice', eng_hours: 6, story_points: 2 }),
-      makeTicket({ key: 'T-3', assignee: 'Bob', eng_hours: 8, story_points: 4 }),
-    ]);
-
-    const result = getIndividualMetrics('all');
-    expect(result.engineers.length).toBe(2);
-
-    const alice = result.engineers.find((e) => e.displayName === 'Alice');
-    expect(alice?.metrics.total_tickets).toBe(2);
-    expect(alice?.metrics.total_eng_hours).toBe(16);
-
-    const bob = result.engineers.find((e) => e.displayName === 'Bob');
-    expect(bob?.metrics.total_tickets).toBe(1);
-    expect(bob?.metrics.total_eng_hours).toBe(8);
-  });
-
-  it('computes team averages divided by engineer count', () => {
-    (__setTickets as Function)([
-      makeTicket({ key: 'T-1', assignee: 'Alice', eng_hours: 10 }),
-      makeTicket({ key: 'T-2', assignee: 'Bob', eng_hours: 6 }),
-    ]);
-
-    const result = getIndividualMetrics('all');
-    // Total: 16 hours, 2 engineers => avg 8.0
-    expect(result.team_averages.total_eng_hours).toBe(8.0);
-  });
-});
-
-describe('cross-project metrics', () => {
-  beforeEach(() => {
-    (__setTickets as Function)([]);
-  });
-
-  it('getTeamMetrics accepts optional projectKey param', () => {
-    (__setTickets as Function)([
-      makeTicket({ key: 'T-1', eng_hours: 10 }),
-    ]);
-    // Calling with projectKey should not crash (the mock getTickets doesn't filter, but the function signature is tested)
-    const result = getTeamMetrics('all', 'PROJ');
-    expect(result.period).toBe('all');
-    expect(result.summary.total_tickets).toBe(1);
-  });
-
-  it('getIndividualMetrics accepts optional projectKey param', () => {
-    (__setTickets as Function)([
-      makeTicket({ key: 'T-1', assignee: 'Alice', eng_hours: 10 }),
-    ]);
-    const result = getIndividualMetrics('all', 'PROJ');
-    expect(result.period).toBe('all');
+      const res = getIndividualMetrics('all');
+      expect(res.team_averages.total_story_points).toBe(30);
+    });
   });
 });

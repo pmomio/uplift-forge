@@ -8,9 +8,12 @@ import type { JiraField, JiraStatus, JiraMember, ProjectInfo } from '../../share
  *   {baseUrl}/rest/api/3/...
  */
 
-async function jiraFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  const authHeader = getAuthHeader();
-  const baseUrl = getBaseUrl();
+async function jiraFetch(path: string, options: RequestInit = {}, overrideCreds?: { baseUrl: string, email: string, apiToken: string }): Promise<Response> {
+  const authHeader = overrideCreds 
+    ? `Basic ${Buffer.from(`${overrideCreds.email}:${overrideCreds.apiToken}`).toString('base64')}`
+    : getAuthHeader();
+  const baseUrl = overrideCreds ? overrideCreds.baseUrl : getBaseUrl();
+
   if (!authHeader || !baseUrl) {
     throw new Error('Not authenticated — no credentials configured');
   }
@@ -23,14 +26,50 @@ async function jiraFetch(path: string, options: RequestInit = {}): Promise<Respo
       'Authorization': authHeader,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'Accept-Language': 'en-US,en;q=0.9',
       ...options.headers,
     },
   });
 
   if (!response.ok) {
-    throw new Error(`JIRA API error ${response.status}: ${await response.text()}`);
+    const status = response.status;
+    let errorMessage = `JIRA API error ${status}`;
+    
+    try {
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        const errorJson = await response.json() as { errorMessages?: string[], errors?: Record<string, string> };
+        if (errorJson.errorMessages && errorJson.errorMessages.length > 0) {
+          errorMessage += `: ${errorJson.errorMessages.join(', ')}`;
+        } else if (errorJson.errors) {
+          errorMessage += `: ${JSON.stringify(errorJson.errors)}`;
+        }
+      } else {
+        const text = await response.text();
+        if (text && text.trim().length > 0) {
+          // If it looks like HTML, don't dump the whole thing
+          if (text.trim().startsWith('<')) {
+            errorMessage += ' (received HTML response)';
+          } else {
+            const cleanText = text.replace(/\s+/g, ' ').trim();
+            errorMessage += `: ${cleanText.substring(0, 200)}${cleanText.length > 200 ? '...' : ''}`;
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore parsing errors
+    }
+    
+    throw new Error(errorMessage);
   }
   return response;
+}
+
+/**
+ * Verify JIRA credentials by fetching the current user.
+ */
+export async function verifyCredentials(baseUrl: string, email: string, apiToken: string): Promise<void> {
+  await jiraFetch('/myself', {}, { baseUrl, email, apiToken });
 }
 
 /**
@@ -124,11 +163,26 @@ export async function searchIssues(jql: string): Promise<unknown[]> {
   const result = await response.json() as { issues?: unknown[] };
   return result.issues ?? [];
 }
-
 /**
  * Get all custom fields.
  */
 export async function getAllFields(): Promise<JiraField[]> {
+  const baseUrl = getBaseUrl();
+  if (baseUrl === 'https://demo.atlassian.net') {
+    return [
+      { id: 'customfield_sp', name: 'Story Points', type: 'number' },
+      { id: 'summary', name: 'Summary', type: 'string' },
+      { id: 'issuetype', name: 'Issue Type', type: 'issuetype' },
+      { id: 'priority', name: 'Priority', type: 'priority' },
+      { id: 'assignee', name: 'Assignee', type: 'user' },
+      { id: 'status', name: 'Status', type: 'status' },
+      { id: 'components', name: 'Components', type: 'array' },
+      { id: 'labels', name: 'Labels', type: 'array' },
+      { id: 'created', name: 'Created', type: 'datetime' },
+      { id: 'resolutiondate', name: 'Resolved', type: 'datetime' },
+    ];
+  }
+
   const response = await jiraFetch('/field');
   const fields = await response.json() as Array<{
     id: string;
@@ -146,18 +200,33 @@ export async function getAllFields(): Promise<JiraField[]> {
  * Get all workflow statuses.
  */
 export async function getAllStatuses(): Promise<JiraStatus[]> {
+  const baseUrl = getBaseUrl();
+  if (baseUrl === 'https://demo.atlassian.net') {
+    return [
+      { id: '1', name: 'To Do' },
+      { id: '2', name: 'In Progress' },
+      { id: '3', name: 'Code Review' },
+      { id: '4', name: 'QA' },
+      { id: '5', name: 'Done' },
+      { id: '6', name: 'Blocked' },
+      { id: '7', name: 'Resolved' },
+      { id: '8', name: 'Closed' },
+    ];
+  }
+
   const response = await jiraFetch('/status');
   const statuses = await response.json() as Array<{ id: string; name: string }>;
   const seen = new Set<string>();
   const result: JiraStatus[] = [];
-  for (const status of statuses) {
-    if (status.name && !seen.has(status.name)) {
-      seen.add(status.name);
-      result.push({ id: status.id, name: status.name });
+
+  for (const s of statuses) {
+    if (!seen.has(s.name)) {
+      seen.add(s.name);
+      result.push({ id: s.id, name: s.name });
     }
   }
-  result.sort((a, b) => a.name.localeCompare(b.name));
-  return result;
+
+  return result.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**

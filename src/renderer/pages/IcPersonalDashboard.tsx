@@ -56,7 +56,7 @@ const TOOLTIPS = {
     target: '80-120% is well calibrated. <60% = over-estimating. >150% = under-estimating.',
     trendUp: 'Your estimates becoming less accurate',
     trendDown: 'Your estimates improving',
-    derivation: 'Data source: JIRA story_points + computed engineering hours from field-engine.\nComputation: Per ticket: (actual_eng_hours ÷ (SP × sp_to_days × 8)) × 100. Averaged across your tickets with both values.\nFilters: Only your resolved tickets with SP > 0 and eng hours > 0.\nConfig dependency: my_account_id, sp_to_days, eng_start_status, eng_end_status, office_hours.',
+    derivation: 'Data source: JIRA story_points + computed active time from JIRA history.\nComputation: Per ticket: (active_time_hours ÷ (SP × sp_to_days × 8)) × 100. Averaged across your tickets with both values.\nFilters: Only your resolved tickets with SP > 0 and active time > 0.\nConfig dependency: my_account_id, sp_to_days, active_statuses.',
   },
   firstTimePassRate: {
     description: 'Percentage of your tickets completed without backward status transitions.',

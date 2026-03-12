@@ -1,149 +1,88 @@
-import React, { useMemo } from 'react';
-import type { MissingFilter } from '../pages/EngineeringAttribution';
-
-interface Ticket {
-  key: string;
-  summary: string;
-  status: string;
-  assignee: string;
-  eng_hours: number | null;
-  tpd_bu: string | null;
-  work_stream: string | null;
-  has_computed_values: boolean;
-  base_url: string;
-}
+import React from 'react';
+import { 
+  CheckCircle2, 
+  AlertCircle, 
+  BarChart2, 
+  Zap
+} from 'lucide-react';
+import type { ProcessedTicket } from '../../shared/types';
 
 interface TicketSummaryProps {
-  tickets: Ticket[];
-  activeFilter: MissingFilter;
-  onFilterChange: (filter: MissingFilter) => void;
+  tickets: ProcessedTicket[];
+  activeFilter: string | null;
+  onFilterChange: (filter: string | null) => void;
 }
 
-const statusDotColors: Record<string, string> = {
-  'Done': 'bg-emerald-400',
-  'Closed': 'bg-emerald-400',
-  'Resolved': 'bg-emerald-400',
-  'Rejected': 'bg-rose-400',
-  'Cancelled': 'bg-rose-400',
-};
-
 const TicketSummary: React.FC<TicketSummaryProps> = ({ tickets, activeFilter, onFilterChange }) => {
-  const stats = useMemo(() => {
-    const total = tickets.length;
+  const total = tickets.length;
+  
+  const stats = React.useMemo(() => {
+    if (total === 0) return {
+      avgSP: 0,
+      totalSP: 0,
+      missingSP: 0
+    };
 
-    const byStatus: Record<string, number> = {};
-    tickets.forEach(t => {
-      byStatus[t.status] = (byStatus[t.status] || 0) + 1;
-    });
+    const withSP = tickets.filter(t => t.story_points != null);
+    const avgSP = withSP.length > 0 
+      ? withSP.reduce((sum, t) => sum + (t.story_points || 0), 0) / withSP.length 
+      : 0;
+    const totalSP = withSP.reduce((sum, t) => sum + (t.story_points || 0), 0);
 
-    const withHours = tickets.filter(t => t.eng_hours != null);
-    const avgHours = withHours.length > 0
-      ? withHours.reduce((sum, t) => sum + (t.eng_hours || 0), 0) / withHours.length
-      : null;
-    const totalHours = withHours.reduce((sum, t) => sum + (t.eng_hours || 0), 0);
-
-    const missingTpd = tickets.filter(t => !t.tpd_bu).length;
-    const missingHours = tickets.filter(t => t.eng_hours == null).length;
-    const missingWs = tickets.filter(t => !t.work_stream).length;
-    const complete = tickets.filter(t => t.tpd_bu && t.eng_hours != null && t.work_stream).length;
-
-    return { total, byStatus, avgHours, totalHours, missingTpd, missingHours, missingWs, complete };
-  }, [tickets]);
-
-  const completePct = stats.total > 0 ? Math.round((stats.complete / stats.total) * 100) : 0;
+    const missingSP = tickets.filter(t => t.story_points == null).length;
+    
+    return {
+      avgSP,
+      totalSP,
+      missingSP
+    };
+  }, [tickets, total]);
 
   return (
-    <div className="mt-3 bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700/50 shadow-xl shadow-black/20 px-5 py-4 animate-slide-up">
-      <div className="flex flex-wrap items-center gap-3 text-xs">
-
-        {/* Total */}
-        <div className="bg-slate-700/40 border border-slate-600/30 rounded-lg px-3 py-2 flex items-center gap-2 hover:bg-slate-700/50 hover:border-slate-500/30 transition-colors duration-150">
-          <span className="text-slate-400">Tickets</span>
-          <span className="text-slate-100 font-semibold text-sm tabular-nums">{stats.total}</span>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      {/* Overview Card */}
+      <div className="bg-slate-800/50 border border-slate-700 p-4 rounded-xl flex items-center gap-4 shadow-sm">
+        <div className="w-12 h-12 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+          <BarChart2 size={24} />
         </div>
-
-        {/* Status breakdown */}
-        <div className="bg-slate-700/40 border border-slate-600/30 rounded-lg px-3 py-2 flex items-center gap-4 hover:bg-slate-700/50 hover:border-slate-500/30 transition-colors duration-150">
-          {Object.entries(stats.byStatus)
-            .sort(([, a], [, b]) => b - a)
-            .map(([status, count]) => (
-              <div key={status} className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${statusDotColors[status] || 'bg-sky-400'}`} />
-                <span className="text-slate-400">{status}</span>
-                <span className="text-slate-200 font-semibold tabular-nums">{count}</span>
-              </div>
-            ))}
+        <div>
+          <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Tickets</div>
+          <div className="text-2xl font-bold text-slate-100">{total}</div>
         </div>
+      </div>
 
-        {/* Eng Hours */}
-        <div className="bg-slate-700/40 border border-slate-600/30 rounded-lg px-3 py-2 flex items-center gap-4 hover:bg-slate-700/50 hover:border-slate-500/30 transition-colors duration-150">
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400">Avg Hours</span>
-            <span className="text-slate-100 font-semibold tabular-nums">
-              {stats.avgHours != null ? stats.avgHours.toFixed(1) : '--'}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-400">Total</span>
-            <span className="text-slate-200 font-semibold tabular-nums">{stats.totalHours.toFixed(1)}h</span>
+      {/* Story Points Card */}
+      <div className="bg-slate-800/50 border border-slate-700 p-4 rounded-xl flex items-center gap-4 shadow-sm">
+        <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400">
+          <Zap size={24} />
+        </div>
+        <div>
+          <div className="text-xs font-medium text-slate-500 uppercase tracking-wider">Total Story Points</div>
+          <div className="flex items-baseline gap-2">
+            <div className="text-2xl font-bold text-slate-100">{stats.totalSP}</div>
+            <div className="text-xs text-slate-500">avg {stats.avgSP.toFixed(1)}</div>
           </div>
         </div>
+      </div>
 
-        {/* Field coverage */}
-        <div className="bg-slate-700/40 border border-slate-600/30 rounded-lg px-3 py-2 flex items-center gap-2 hover:bg-slate-700/50 hover:border-slate-500/30 transition-colors duration-150">
-          <span className="text-slate-400">Fields Complete</span>
-          <span className={`font-semibold tabular-nums ${completePct === 100 ? 'text-emerald-400' : 'text-slate-100'}`}>
-            {completePct}%
-          </span>
-          <span className="text-slate-500 tabular-nums">({stats.complete}/{stats.total})</span>
+      {/* Missing Data Card */}
+      <div className="bg-slate-800/50 border border-slate-700 p-4 rounded-xl shadow-sm">
+        <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+          <AlertCircle size={12} />
+          Missing Data
         </div>
-
-        {/* Missing fields */}
-        {(stats.missingTpd > 0 || stats.missingHours > 0 || stats.missingWs > 0) && (
-          <div className="bg-rose-500/8 border border-rose-500/20 rounded-lg px-3 py-2 flex items-center gap-1 shadow-sm shadow-rose-500/5">
-            <span className="text-rose-300 mr-2">Missing</span>
-            {stats.missingTpd > 0 && (
-              <button
-                onClick={() => onFilterChange(activeFilter === 'tpd_bu' ? null : 'tpd_bu')}
-                className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${
-                  activeFilter === 'tpd_bu'
-                    ? 'bg-rose-500/25 ring-1 ring-rose-400/40'
-                    : 'hover:bg-rose-500/15'
-                }`}
-              >
-                <span className="text-slate-300">TPD BU</span>
-                <span className="text-rose-400 font-semibold tabular-nums">{stats.missingTpd}</span>
-              </button>
-            )}
-            {stats.missingHours > 0 && (
-              <button
-                onClick={() => onFilterChange(activeFilter === 'eng_hours' ? null : 'eng_hours')}
-                className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${
-                  activeFilter === 'eng_hours'
-                    ? 'bg-rose-500/25 ring-1 ring-rose-400/40'
-                    : 'hover:bg-rose-500/15'
-                }`}
-              >
-                <span className="text-slate-300">Hours</span>
-                <span className="text-rose-400 font-semibold tabular-nums">{stats.missingHours}</span>
-              </button>
-            )}
-            {stats.missingWs > 0 && (
-              <button
-                onClick={() => onFilterChange(activeFilter === 'work_stream' ? null : 'work_stream')}
-                className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${
-                  activeFilter === 'work_stream'
-                    ? 'bg-rose-500/25 ring-1 ring-rose-400/40'
-                    : 'hover:bg-rose-500/15'
-                }`}
-              >
-                <span className="text-slate-300">Work Stream</span>
-                <span className="text-rose-400 font-semibold tabular-nums">{stats.missingWs}</span>
-              </button>
-            )}
-          </div>
-        )}
-
+        <div className="flex gap-2">
+          <button 
+            onClick={() => onFilterChange(activeFilter === 'story_points' ? null : 'story_points')}
+            className={`flex-1 px-3 py-1 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              activeFilter === 'story_points' 
+                ? 'bg-rose-500 text-white shadow-sm' 
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            {`Missing SP (${stats.missingSP})`}
+          </button>
+        </div>
       </div>
     </div>
   );

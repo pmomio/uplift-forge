@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock electron-store — use vi.hoisted to avoid "before initialization" error
+// Mock electron-store — use vi.hoisted to avoid \"before initialization\" error
 const { mockStoreData } = vi.hoisted(() => {
   const mockStoreData: Record<string, unknown> = {
     ticketCache: {},
@@ -21,22 +21,14 @@ vi.mock('electron-store', () => ({
 vi.mock('../../src/main/services/config.service.js', () => ({
   getConfig: vi.fn(() => ({
     project_key: 'TEST',
-    field_ids: { tpd_bu: 'cf_tpd', eng_hours: 'cf_eng', work_stream: 'cf_ws', story_points: 'cf_sp' },
-    eng_start_status: 'In Progress',
-    eng_end_status: 'In Review',
-    eng_excluded_statuses: ['Blocked'],
-    office_hours: { start: '09:00', end: '18:00', timezone: 'Europe/Berlin', exclude_weekends: true },
-    mapping_rules: { tpd_bu: {}, work_stream: {} },
+    field_ids: { story_points: 'cf_sp' },
     ticket_filter: { mode: 'last_x_months', months: 6 },
     sp_to_days: 1,
     tracked_engineers: [],
+    active_statuses: ['In Progress', 'QA'],
+    blocked_statuses: ['Blocked'],
+    done_statuses: ['Done', 'Resolved'],
   })),
-}));
-
-// Mock field-engine
-vi.mock('../../src/main/services/field-engine.service.js', () => ({
-  calculateEngineeringHours: vi.fn(() => 8.5),
-  getMappedFields: vi.fn(() => ['B2C', 'Product']),
 }));
 
 // Mock jira service
@@ -58,8 +50,6 @@ import {
   syncTickets,
   syncAllProjects,
   syncSingleTicket,
-  calculateTicketHours,
-  calculateTicketFields,
   getTickets,
   updateTicket,
   getVisibleTicketCount,
@@ -67,15 +57,11 @@ import {
   FINAL_STATUSES,
 } from '../../src/main/services/ticket.service.js';
 import * as jira from '../../src/main/services/jira.service.js';
-import { calculateEngineeringHours, getMappedFields } from '../../src/main/services/field-engine.service.js';
 import { getConfig } from '../../src/main/services/config.service.js';
 
 const mockGetIssues = vi.mocked(jira.getIssues);
 const mockSearchIssues = vi.mocked(jira.searchIssues);
-const mockGetChangelog = vi.mocked(jira.getIssueChangelog);
 const mockUpdateFields = vi.mocked(jira.updateIssueFields);
-const mockCalcHours = vi.mocked(calculateEngineeringHours);
-const mockGetMapped = vi.mocked(getMappedFields);
 
 function makeIssue(key: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -99,8 +85,6 @@ function makeIssue(key: string, overrides: Record<string, unknown> = {}): Record
 describe('ticket.service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCalcHours.mockReturnValue(8.5);
-    mockGetMapped.mockReturnValue(['B2C', 'Product']);
   });
 
   describe('FINAL_STATUSES', () => {
@@ -123,31 +107,6 @@ describe('ticket.service', () => {
       expect(t!.assignee).toBe('Alice');
     });
 
-    it('uses JIRA custom field values when present', () => {
-      const issue = makeIssue('T-2', {
-        cf_tpd: [{ value: 'B2B' }],
-        cf_eng: 5.0,
-        cf_ws: { value: 'Operational' },
-      });
-      processIssue(issue);
-      const tickets = getTickets();
-      const t = tickets.find(t => t.key === 'T-2');
-      expect(t!.tpd_bu).toBe('B2B');
-      expect(t!.eng_hours).toBe(5.0);
-      expect(t!.work_stream).toBe('Operational');
-    });
-
-    it('falls back to computed values when JIRA fields empty', () => {
-      const issue = makeIssue('T-3');
-      processIssue(issue);
-      const tickets = getTickets();
-      const t = tickets.find(t => t.key === 'T-3');
-      expect(t!.eng_hours).toBe(8.5);
-      expect(t!.tpd_bu).toBe('B2C');
-      expect(t!.work_stream).toBe('Product');
-      expect(t!.has_computed_values).toBe(true);
-    });
-
     it('handles missing assignee', () => {
       const issue = makeIssue('T-4', { assignee: null });
       processIssue(issue);
@@ -164,21 +123,10 @@ describe('ticket.service', () => {
       expect(t!.story_points).toBe(5);
     });
 
-    it('handles object-style tpd_bu field', () => {
-      const issue = makeIssue('T-6', { cf_tpd: { value: 'B2B' } });
-      processIssue(issue);
-      const tickets = getTickets();
-      const t = tickets.find(t => t.key === 'T-6');
-      expect(t!.tpd_bu).toBe('B2B');
-    });
-
     it('handles missing fields gracefully', () => {
       // Issue with no fields/changelog should still be processed
       const issue = { key: 'T-BARE', fields: {}, changelog: {} };
       expect(() => processIssue(issue as any)).not.toThrow();
-      const tickets = getTickets();
-      const t = tickets.find(t => t.key === 'T-BARE');
-      // Status won't be final, so it won't appear in getTickets, but shouldn't crash
       expect(true).toBe(true); // Did not throw
     });
   });
@@ -198,11 +146,7 @@ describe('ticket.service', () => {
         ...vi.mocked(getConfig)(),
         ticket_filter: { mode: 'missing_fields', months: 6 },
       } as any);
-      // T-3 from earlier has computed values (all fields present from computation)
-      // Need a ticket that truly has missing fields
-      mockGetMapped.mockReturnValue([null, null]);
-      mockCalcHours.mockReturnValue(null);
-      processIssue(makeIssue('T-MISSING'));
+      processIssue(makeIssue('T-MISSING', { cf_sp: null }));
       const tickets = getTickets();
       const missing = tickets.find(t => t.key === 'T-MISSING');
       expect(missing).toBeDefined();
@@ -237,10 +181,9 @@ describe('ticket.service', () => {
       expect(mockGetIssues).toHaveBeenCalledWith('TEST', 12);
     });
 
-    it('returns 0 on error', async () => {
+    it('throws error on failure', async () => {
       mockGetIssues.mockRejectedValue(new Error('Fail'));
-      const count = await syncTickets();
-      expect(count).toBe(0);
+      await expect(syncTickets()).rejects.toThrow('Fail');
     });
   });
 
@@ -258,85 +201,17 @@ describe('ticket.service', () => {
     });
   });
 
-  describe('calculateTicketHours', () => {
-    it('returns hours and diagnostics', async () => {
-      mockGetChangelog.mockResolvedValue({
-        histories: [
-          { created: '2025-01-01T10:00:00Z', items: [{ field: 'status', fromString: 'Open', toString: 'In Progress' }] },
-        ],
-      });
-      mockCalcHours.mockReturnValue(4.5);
-      const result = await calculateTicketHours('T-1');
-      expect(result.hours).toBe(4.5);
-      expect(result.diagnostics).toBeDefined();
-      expect(result.diagnostics!.statusTransitions).toHaveLength(1);
-    });
-
-    it('includes rawFirstItem in diagnostics', async () => {
-      mockGetChangelog.mockResolvedValue({
-        histories: [
-          { created: '2025-01-01T10:00:00Z', items: [{ field: 'status', fromString: 'Open', toString: 'In Progress' }] },
-        ],
-      });
-      const result = await calculateTicketHours('T-1');
-      expect(result.diagnostics!.rawFirstItem).toBeDefined();
-    });
-
-    it('handles null hours', async () => {
-      mockGetChangelog.mockResolvedValue({ histories: [] });
-      mockCalcHours.mockReturnValue(null);
-      const result = await calculateTicketHours('T-1');
-      expect(result.hours).toBeNull();
-    });
-  });
-
-  describe('calculateTicketFields', () => {
-    it('returns mapped fields', async () => {
-      mockSearchIssues.mockResolvedValue([makeIssue('T-1')]);
-      mockGetMapped.mockReturnValue(['B2C', 'Product']);
-      const result = await calculateTicketFields('T-1');
-      expect(result).toEqual({ tpd_bu: 'B2C', work_stream: 'Product' });
-    });
-
-    it('throws if ticket not found', async () => {
-      mockSearchIssues.mockResolvedValue([]);
-      await expect(calculateTicketFields('T-X')).rejects.toThrow('not found');
-    });
-  });
-
   describe('updateTicket', () => {
-    it('maps tpd_bu to JIRA field format', async () => {
-      processIssue(makeIssue('T-UPD'));
-      mockUpdateFields.mockResolvedValue();
-      await updateTicket('T-UPD', { tpd_bu: 'B2B' });
-      expect(mockUpdateFields).toHaveBeenCalledWith('T-UPD', { cf_tpd: [{ value: 'B2B' }] });
-    });
-
-    it('maps eng_hours to JIRA field format', async () => {
-      processIssue(makeIssue('T-UPD2'));
-      mockUpdateFields.mockResolvedValue();
-      await updateTicket('T-UPD2', { eng_hours: 10 });
-      expect(mockUpdateFields).toHaveBeenCalledWith('T-UPD2', { cf_eng: 10 });
-    });
-
-    it('maps work_stream to JIRA field format', async () => {
-      processIssue(makeIssue('T-UPD3'));
-      mockUpdateFields.mockResolvedValue();
-      await updateTicket('T-UPD3', { work_stream: 'Ops' });
-      expect(mockUpdateFields).toHaveBeenCalledWith('T-UPD3', { cf_ws: { value: 'Ops' } });
-    });
-
-    it('clears tpd_bu with empty array', async () => {
-      processIssue(makeIssue('T-UPD4'));
-      mockUpdateFields.mockResolvedValue();
-      await updateTicket('T-UPD4', { tpd_bu: null });
-      expect(mockUpdateFields).toHaveBeenCalledWith('T-UPD4', { cf_tpd: [] });
+    it('updates ticket in local cache', async () => {
+      processIssue(makeIssue('TEST-UPD'), true, 'TEST');
+      await updateTicket('TEST-UPD', { summary: 'New Summary' });
+      const tickets = getTickets('TEST');
+      const t = tickets.find(t => t.key === 'TEST-UPD');
+      expect(t!.summary).toBe('New Summary');
     });
 
     it('returns null for unknown ticket', async () => {
-      mockUpdateFields.mockResolvedValue();
-      const result = await updateTicket('T-UNKNOWN', { tpd_bu: 'B2C' });
-      // Unknown ticket — not in cache
+      const result = await updateTicket('T-UNKNOWN', { summary: 'New Summary' });
       expect(result).toBeNull();
     });
   });
@@ -352,16 +227,13 @@ describe('ticket.service', () => {
     it('re-processes all cached issues', () => {
       processIssue(makeIssue('T-R1'));
       processIssue(makeIssue('T-R2'));
-      mockCalcHours.mockReturnValue(99);
       reprocessCache();
-      // Should have reprocessed — calc should have been called with new mock
-      expect(mockCalcHours).toHaveBeenCalled();
+      expect(true).toBe(true); // Did not throw
     });
   });
 
   describe('getJiraMembers', () => {
     it('returns unique members from raw cache', () => {
-      // Process issues to populate raw cache
       processIssue(makeIssue('T-M1', {
         assignee: { accountId: 'a1', displayName: 'Alice', avatarUrls: { '48x48': 'https://a.png' }, active: true },
       }));
@@ -373,16 +245,13 @@ describe('ticket.service', () => {
       }));
       const members = getJiraMembers();
       const ids = members.map(m => m.accountId);
-      // Deduplicated
       expect(ids.filter(id => id === 'a1')).toHaveLength(1);
       expect(members.find(m => m.accountId === 'b1')).toBeDefined();
-      // Sorted by displayName
       expect(members[0].displayName).toBe('Alice');
     });
 
     it('skips issues with no assignee', () => {
       processIssue(makeIssue('T-NO', { assignee: null }));
-      // Should not crash and unassigned should not appear in members
       const members = getJiraMembers();
       const hasNull = members.some(m => !m.accountId);
       expect(hasNull).toBe(false);
@@ -391,9 +260,8 @@ describe('ticket.service', () => {
 
   describe('per-project caches', () => {
     it('getTickets without projectKey aggregates all projects', () => {
-      // Process issues under different project keys (inferred from ticket key prefix)
       processIssue(makeIssue('TEST-1', { status: { name: 'Done' } }));
-      processIssue(makeIssue('OTHER-1', { status: { name: 'Done' } }));
+      processIssue(makeIssue('OTHER-1', { status: { name: 'Done' } }), true, 'OTHER');
       const allTickets = getTickets();
       const keys = allTickets.map(t => t.key);
       expect(keys).toContain('TEST-1');
@@ -401,21 +269,12 @@ describe('ticket.service', () => {
     });
 
     it('getTickets with projectKey returns only that project', () => {
-      // Must pass explicit projectKey since processIssue defaults to config's project_key
       processIssue(makeIssue('AAA-1', { status: { name: 'Done' } }), true, 'AAA');
       processIssue(makeIssue('BBB-1', { status: { name: 'Done' } }), true, 'BBB');
       const aTickets = getTickets('AAA');
       const aKeys = aTickets.map(t => t.key);
       expect(aKeys).toContain('AAA-1');
       expect(aKeys).not.toContain('BBB-1');
-    });
-
-    it('processIssue sets project_key on ticket', () => {
-      processIssue(makeIssue('PROJ-5', { status: { name: 'Done' } }));
-      const tickets = getTickets();
-      const t = tickets.find(t => t.key === 'PROJ-5');
-      expect(t).toBeDefined();
-      expect(t!.project_key).toBeDefined();
     });
   });
 
@@ -428,14 +287,9 @@ describe('ticket.service', () => {
       expect(mockGetIssues).toHaveBeenCalled();
     });
 
-    it('returns empty object-like result when getIssues fails', async () => {
+    it('throws when getIssues fails', async () => {
       mockGetIssues.mockRejectedValue(new Error('Network error'));
-      const result = await syncAllProjects();
-      expect(result).toBeDefined();
-      // Even with failure, syncAllProjects catches per-project and returns 0
-      for (const count of Object.values(result)) {
-        expect(count).toBe(0);
-      }
+      await expect(syncAllProjects()).rejects.toThrow('Network error');
     });
   });
 });

@@ -69,5 +69,5 @@ export function getAiProvider(): AiProvider | null {
 
 export function deleteAiConfig(): void {
   cached = null;
-  aiStore.set('config', null);
+  aiStore.clear();
 }

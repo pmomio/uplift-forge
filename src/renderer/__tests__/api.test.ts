@@ -3,16 +3,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Set up window.api mock with all methods
 const mockApi: Record<string, ReturnType<typeof vi.fn>> = {};
 const apiMethods = [
-  'login', 'logout', 'getAuthState', 'resetApp',
+  'login', 'logout', 'getAuthState', 'resetApp', 'demoLogin',
   'getConfig', 'saveConfig',
   'getJiraProject', 'getJiraFields', 'getJiraStatuses', 'getJiraMembers',
-  'getTickets', 'updateTicket', 'syncSingleTicket', 'calculateHours', 'calculateFields',
-  'triggerSync', 'syncAllProjects',
-  'getTeamMetrics', 'getIndividualMetrics',
+  'getTickets', 'updateTicket', 'syncOneTicket',
+  'syncFull', 'syncAllProjects',
+  'getEmTeamMetrics', 'getEmIndividualMetrics',
+  'getDmFlowMetrics', 'getDmForecastMetrics',
+  'getIcPersonalMetrics', 'getCtoOrgMetrics',
   'checkForUpdates', 'downloadUpdate',
   'getAiConfig', 'setAiConfig', 'deleteAiConfig', 'testAiConnection', 'getAiSuggestions',
   'listProjects', 'addProject', 'updateProject', 'removeProject', 'syncProject', 'getCrossProjectMetrics',
-  'listEpics', 'getEpicDetail', 'syncEpics',
+  'getEpics', 'getEpicDetail', 'syncEpics',
+  'getTimelines',
 ];
 
 for (const method of apiMethods) {
@@ -23,16 +26,19 @@ for (const method of apiMethods) {
 
 // Import after window.api is set up
 import {
-  login, logout, getAuthState, resetApp,
+  login, logout, getAuthState, resetApp, demoLogin,
   getConfig, saveConfig,
   getJiraProject, getJiraFields, getJiraStatuses, getJiraMembers,
-  getTickets, updateTicket, syncSingleTicket, calculateHours, calculateFields,
-  triggerSync, syncAllProjects,
-  getTeamMetrics, getIndividualMetrics,
+  getTickets, updateTicket, syncOneTicket,
+  syncFull, syncAllProjects,
+  getEmTeamMetrics, getEmIndividualMetrics,
+  getDmFlowMetrics, getDmForecastMetrics,
+  getIcPersonalMetrics, getCtoOrgMetrics,
   checkForUpdates, downloadUpdate,
   getAiConfig, setAiConfig, deleteAiConfig, testAiConnection, getAiSuggestions,
   listProjects, addProject, updateProjectConfig, removeProject, syncProject, getCrossProjectMetrics,
-  listEpics, getEpicDetail, syncEpics,
+  getEpics, getEpicDetail, syncEpics,
+  getTimelines,
 } from '../api';
 
 describe('api wrappers', () => {
@@ -47,6 +53,12 @@ describe('api wrappers', () => {
     const res = await login('url', 'email', 'token');
     expect(res).toEqual({ data: 'result' });
     expect(mockApi.login).toHaveBeenCalledWith('url', 'email', 'token');
+  });
+
+  it('wraps demoLogin', async () => {
+    const res = await demoLogin();
+    expect(res).toEqual({ data: 'result' });
+    expect(mockApi.demoLogin).toHaveBeenCalled();
   });
 
   it('wraps logout', async () => {
@@ -101,49 +113,37 @@ describe('api wrappers', () => {
   });
 
   it('wraps updateTicket', async () => {
-    const res = await updateTicket('T-1', { eng_hours: 5 });
+    const res = await updateTicket('T-1', { summary: 'New' });
     expect(res).toEqual({ data: 'result' });
-    expect(mockApi.updateTicket).toHaveBeenCalledWith('T-1', { eng_hours: 5 });
+    expect(mockApi.updateTicket).toHaveBeenCalledWith('T-1', { summary: 'New' });
   });
 
-  it('wraps syncSingleTicket', async () => {
-    const res = await syncSingleTicket('T-1');
+  it('wraps syncOneTicket', async () => {
+    const res = await syncOneTicket('T-1');
     expect(res).toEqual({ data: 'result' });
-    expect(mockApi.syncSingleTicket).toHaveBeenCalledWith('T-1');
+    expect(mockApi.syncOneTicket).toHaveBeenCalledWith('T-1');
   });
 
-  it('wraps calculateHours', async () => {
-    const res = await calculateHours('T-1');
-    expect(res).toEqual({ data: 'result' });
-    expect(mockApi.calculateHours).toHaveBeenCalledWith('T-1');
-  });
-
-  it('wraps calculateFields', async () => {
-    const res = await calculateFields('T-1');
-    expect(res).toEqual({ data: 'result' });
-    expect(mockApi.calculateFields).toHaveBeenCalledWith('T-1');
-  });
-
-  it('wraps triggerSync', async () => {
-    const res = await triggerSync();
+  it('wraps syncFull', async () => {
+    const res = await syncFull();
     expect(res).toEqual({ data: 'result' });
   });
 
-  it('wraps getTeamMetrics with default period', async () => {
-    const res = await getTeamMetrics();
+  it('wraps getEmTeamMetrics with default period', async () => {
+    const res = await getEmTeamMetrics();
     expect(res).toEqual({ data: 'result' });
-    expect(mockApi.getTeamMetrics).toHaveBeenCalledWith('all', undefined);
+    expect(mockApi.getEmTeamMetrics).toHaveBeenCalledWith('all', undefined);
   });
 
-  it('wraps getTeamMetrics with custom period', async () => {
-    await getTeamMetrics('weekly');
-    expect(mockApi.getTeamMetrics).toHaveBeenCalledWith('weekly', undefined);
+  it('wraps getEmTeamMetrics with custom period', async () => {
+    await getEmTeamMetrics('weekly');
+    expect(mockApi.getEmTeamMetrics).toHaveBeenCalledWith('weekly', undefined);
   });
 
-  it('wraps getIndividualMetrics with default period', async () => {
-    const res = await getIndividualMetrics();
+  it('wraps getEmIndividualMetrics with default period', async () => {
+    const res = await getEmIndividualMetrics();
     expect(res).toEqual({ data: 'result' });
-    expect(mockApi.getIndividualMetrics).toHaveBeenCalledWith('all', undefined);
+    expect(mockApi.getEmIndividualMetrics).toHaveBeenCalledWith('all', undefined);
   });
 
   it('wraps checkForUpdates', async () => {
@@ -196,20 +196,20 @@ describe('api wrappers', () => {
     expect(mockApi.getTickets).toHaveBeenCalledWith('PROJ');
   });
 
-  it('wraps triggerSync with optional projectKey', async () => {
-    const res = await triggerSync('PROJ');
+  it('wraps syncFull with optional projectKey', async () => {
+    const res = await syncFull('PROJ');
     expect(res).toEqual({ data: 'result' });
-    expect(mockApi.triggerSync).toHaveBeenCalledWith('PROJ');
+    expect(mockApi.syncFull).toHaveBeenCalledWith('PROJ');
   });
 
-  it('wraps getTeamMetrics with projectKey', async () => {
-    await getTeamMetrics('all', 'PROJ');
-    expect(mockApi.getTeamMetrics).toHaveBeenCalledWith('all', 'PROJ');
+  it('wraps getEmTeamMetrics with projectKey', async () => {
+    await getEmTeamMetrics('all', 'PROJ');
+    expect(mockApi.getEmTeamMetrics).toHaveBeenCalledWith('all', 'PROJ');
   });
 
-  it('wraps getIndividualMetrics with projectKey', async () => {
-    await getIndividualMetrics('all', 'PROJ');
-    expect(mockApi.getIndividualMetrics).toHaveBeenCalledWith('all', 'PROJ');
+  it('wraps getEmIndividualMetrics with projectKey', async () => {
+    await getEmIndividualMetrics('all', 'PROJ');
+    expect(mockApi.getEmIndividualMetrics).toHaveBeenCalledWith('all', 'PROJ');
   });
 
   it('wraps listProjects', async () => {
@@ -225,9 +225,9 @@ describe('api wrappers', () => {
   });
 
   it('wraps updateProjectConfig', async () => {
-    const res = await updateProjectConfig('PROJ', { eng_start_status: 'Dev' });
+    const res = await updateProjectConfig('PROJ', { project_name: 'Dev' });
     expect(res).toEqual({ data: 'result' });
-    expect(mockApi.updateProject).toHaveBeenCalledWith('PROJ', { eng_start_status: 'Dev' });
+    expect(mockApi.updateProject).toHaveBeenCalledWith('PROJ', { project_name: 'Dev' });
   });
 
   it('wraps removeProject', async () => {
@@ -248,10 +248,10 @@ describe('api wrappers', () => {
     expect(mockApi.getCrossProjectMetrics).toHaveBeenCalledWith('monthly');
   });
 
-  it('wraps listEpics with optional projectKey', async () => {
-    const res = await listEpics('PROJ');
+  it('wraps getEpics with optional projectKey', async () => {
+    const res = await getEpics('PROJ');
     expect(res).toEqual({ data: 'result' });
-    expect(mockApi.listEpics).toHaveBeenCalledWith('PROJ');
+    expect(mockApi.getEpics).toHaveBeenCalledWith('PROJ');
   });
 
   it('wraps getEpicDetail with optional projectKey', async () => {
@@ -264,5 +264,11 @@ describe('api wrappers', () => {
     const res = await syncEpics('PROJ');
     expect(res).toEqual({ data: 'result' });
     expect(mockApi.syncEpics).toHaveBeenCalledWith('PROJ');
+  });
+
+  it('wraps getTimelines', async () => {
+    const res = await getTimelines('PROJ');
+    expect(res).toEqual({ data: 'result' });
+    expect(mockApi.getTimelines).toHaveBeenCalledWith('PROJ');
   });
 });

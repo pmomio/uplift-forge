@@ -15,6 +15,7 @@ import {
   getAllFields,
   getAllStatuses,
   getProject,
+  verifyCredentials,
 } from '../../src/main/services/jira.service.js';
 import { getAuthHeader, getBaseUrl } from '../../src/main/auth/token-store.js';
 
@@ -219,6 +220,88 @@ describe('jira.service', () => {
       expect(result.key).toBe('PROJ');
       expect(result.name).toBe('PROJ');
       expect((result as any).error).toBeDefined();
+    });
+  });
+
+  describe('verifyCredentials', () => {
+    it('sends request to /myself with override credentials', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ 
+        ok: true, 
+        status: 200,
+        json: async () => ({}),
+        text: async () => ''
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      
+      const baseUrl = 'https://custom.jira';
+      const email = 'user@test.com';
+      const apiToken = 'token123';
+      
+      await verifyCredentials(baseUrl, email, apiToken);
+      
+      const [url, opts] = fetchMock.mock.calls[0];
+      expect(url).toBe('https://custom.jira/rest/api/3/myself');
+      const expectedAuth = `Basic ${Buffer.from(`${email}:${apiToken}`).toString('base64')}`;
+      expect(opts.headers.Authorization).toBe(expectedAuth);
+    });
+
+    it('throws error on invalid credentials (401)', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: async () => 'Unauthorized',
+        headers: new Map([['content-type', 'text/plain']]),
+      }));
+      
+      await expect(verifyCredentials('https://test', 'a', 'b')).rejects.toThrow('JIRA API error 401: Unauthorized');
+    });
+
+    it('throws error on other API errors', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: async () => 'Server error',
+        headers: new Map([['content-type', 'text/plain']]),
+      }));
+      
+      await expect(verifyCredentials('https://test', 'a', 'b')).rejects.toThrow('JIRA API error 500: Server error');
+    });
+
+    it('handles HTML error response without dumping full body', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        text: async () => '<html><body>Unauthorized</body></html>',
+        headers: new Map([['content-type', 'text/html']]),
+      }));
+      
+      await expect(verifyCredentials('https://test', 'a', 'b')).rejects.toThrow('JIRA API error 401 (received HTML response)');
+    });
+
+    it('truncates long text error responses', async () => {
+      const longText = 'A'.repeat(500);
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () => longText,
+        headers: new Map([['content-type', 'text/plain']]),
+      }));
+      
+      const error = await verifyCredentials('https://test', 'a', 'b').catch(e => e.message);
+      expect(error).toContain('JIRA API error 400');
+      expect(error.length).toBeLessThan(300);
+      expect(error).toContain('...');
+    });
+
+    it('parses JIRA JSON error messages', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ errorMessages: ['Validation failed', 'Missing field'] }),
+        headers: new Map([['content-type', 'application/json']]),
+      }));
+      
+      await expect(verifyCredentials('https://test', 'a', 'b')).rejects.toThrow('JIRA API error 400: Validation failed, Missing field');
     });
   });
 });
