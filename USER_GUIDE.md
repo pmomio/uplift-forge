@@ -265,6 +265,11 @@ Values are color-coded against team average: 🟢 better, 🔴 worse.
 
 Track epic-level delivery progress and identify risks 📊.
 
+### ✨ AI-Powered Risk Analysis
+Uplift Forge uses AI to analyze your epics and provide mitigation strategies:
+- **Summary Analysis**: Click the sparkles ✨ next to "Delivery Risk Overview" for a high-level org/project risk assessment.
+- **Epic-Specific Analysis**: Click the sparkles ✨ on any epic card to get tailored suggestions for that specific epic's blockers, progress, and risk factors.
+
 ### 🧮 How Risk is Calculated
 
 The risk score combines 4 factors automatically:
