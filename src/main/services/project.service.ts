@@ -12,8 +12,11 @@ export function listProjects(): ProjectConfig[] {
   const cfg = getConfig();
   const projects: ProjectConfig[] = [];
 
+  const seenKeys = new Set<string>();
+
   // Primary project (from flat config fields)
   if (cfg.project_key) {
+    seenKeys.add(cfg.project_key);
     projects.push({
       project_key: cfg.project_key,
       project_name: cfg.project_key,
@@ -28,7 +31,12 @@ export function listProjects(): ProjectConfig[] {
 
   // Additional projects
   if (cfg.projects) {
-    projects.push(...cfg.projects);
+    for (const p of cfg.projects) {
+      if (!seenKeys.has(p.project_key)) {
+        seenKeys.add(p.project_key);
+        projects.push(p);
+      }
+    }
   }
 
   return projects;

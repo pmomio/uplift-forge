@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, BarChart3, Bug, Wrench, Zap, Users, FolderOpen, Gauge, Layers, BookOpen } from 'lucide-react';
+import { RefreshCw, BarChart3, Bug, Wrench, Zap, Users, FolderOpen, Gauge, Layers, BookOpen, Sparkles } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, Legend, Cell,
