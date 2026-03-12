@@ -169,7 +169,7 @@ const TrendArrow: React.FC<{ change: number; lowerIsBetter?: boolean }> = ({ cha
   const Icon = isUp ? TrendingUp : TrendingDown;
   return (
     <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${colorClass} mb-0.5`}>
-      <Icon size={10} />{abs.toFixed(0)}%
+      <Icon size={10} />{abs.toFixed(2)}%
     </span>
   );
 };

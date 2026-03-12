@@ -20,59 +20,74 @@ function addHours(date: Date, hours: number): Date {
   return new Date(date.getTime() + hours * 60 * 60 * 1000);
 }
 
-function generateHistory(createdDate: Date, isDone: boolean, hasRework: boolean, hasBlocker: boolean) {
+function generateHistory(createdDate: Date, isDone: boolean, hasRework: boolean, hasBlocker: boolean, storyPoints: number) {
   const histories = [];
   let currentDate = createdDate;
 
-  // Transition to In Progress
-  currentDate = addHours(currentDate, Math.random() * 24 + 2);
+  // Expected active hours = SP * 8
+  // We'll distribute this across In Progress, Code Review, and QA
+  const totalActiveTarget = storyPoints * 8 * (0.8 + Math.random() * 0.4); // 80% to 120% accuracy range
+  
+  const inProgressWeight = 0.6;
+  const reviewWeight = 0.2;
+  const qaWeight = 0.2;
+
+  // Transition to In Progress (Lead time start)
+  currentDate = addHours(currentDate, Math.random() * 48 + 4); // created -> start
   histories.push({
     created: currentDate.toISOString(),
     items: [{ field: 'status', fromString: 'To Do', toString: 'In Progress' }],
   });
 
   if (hasBlocker) {
-    currentDate = addHours(currentDate, Math.random() * 48 + 12);
+    currentDate = addHours(currentDate, Math.random() * 24 + 4);
     histories.push({
       created: currentDate.toISOString(),
       items: [{ field: 'status', fromString: 'In Progress', toString: 'Blocked' }],
     });
-    currentDate = addHours(currentDate, Math.random() * 72 + 24);
+    currentDate = addHours(currentDate, Math.random() * 48 + 12);
     histories.push({
       created: currentDate.toISOString(),
       items: [{ field: 'status', fromString: 'Blocked', toString: 'In Progress' }],
     });
   }
 
+  // Work time
+  currentDate = addHours(currentDate, totalActiveTarget * inProgressWeight);
+  
   // Code Review
-  currentDate = addHours(currentDate, Math.random() * 72 + 10);
   histories.push({
     created: currentDate.toISOString(),
     items: [{ field: 'status', fromString: 'In Progress', toString: 'Code Review' }],
   });
 
   if (hasRework) {
-    currentDate = addHours(currentDate, Math.random() * 12 + 2);
+    currentDate = addHours(currentDate, Math.random() * 8 + 2);
     histories.push({
       created: currentDate.toISOString(),
       items: [{ field: 'status', fromString: 'Code Review', toString: 'In Progress' }],
     });
-    currentDate = addHours(currentDate, Math.random() * 24 + 10);
+    currentDate = addHours(currentDate, Math.random() * 12 + 4);
     histories.push({
       created: currentDate.toISOString(),
       items: [{ field: 'status', fromString: 'In Progress', toString: 'Code Review' }],
     });
   }
 
+  // Review time
+  currentDate = addHours(currentDate, totalActiveTarget * reviewWeight);
+
   // QA
-  currentDate = addHours(currentDate, Math.random() * 24 + 2);
   histories.push({
     created: currentDate.toISOString(),
     items: [{ field: 'status', fromString: 'Code Review', toString: 'QA' }],
   });
 
+  // QA time
+  currentDate = addHours(currentDate, totalActiveTarget * qaWeight);
+
   if (isDone) {
-    currentDate = addHours(currentDate, Math.random() * 48 + 4);
+    currentDate = addHours(currentDate, Math.random() * 4 + 1);
     histories.push({
       created: currentDate.toISOString(),
       items: [{ field: 'status', fromString: 'QA', toString: 'Done' }],
@@ -102,13 +117,14 @@ export function generateMockIssues(projectKey: string, count = 100): any[] {
     const priority = PRIORITIES[Math.floor(Math.random() * PRIORITIES.length)];
     const component = COMPONENTS[Math.floor(Math.random() * COMPONENTS.length)];
     const label = LABELS[Math.floor(Math.random() * LABELS.length)];
+    const storyPoints = Math.floor(Math.random() * 8) + 1;
     
     const isDone = Math.random() > 0.15;
     const hasRework = Math.random() > 0.8;
     const hasBlocker = Math.random() > 0.85;
 
     const createdDate = randomDateBetween(threeMonthsAgo, new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000));
-    const { histories, lastDate } = generateHistory(createdDate, isDone, hasRework, hasBlocker);
+    const { histories, lastDate } = generateHistory(createdDate, isDone, hasRework, hasBlocker, storyPoints);
 
     issues.push({
       key: `${projectKey}-${i + 1}`,
@@ -121,7 +137,7 @@ export function generateMockIssues(projectKey: string, count = 100): any[] {
         created: createdDate.toISOString(),
         resolutiondate: isDone ? lastDate.toISOString() : null,
         updated: lastDate.toISOString(),
-        customfield_sp: Math.floor(Math.random() * 8) + 1,
+        customfield_sp: storyPoints,
         parent: { key: epic.key, fields: { summary: epic.summary } },
         components: [{ name: component }],
         labels: [label],

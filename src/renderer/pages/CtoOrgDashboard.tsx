@@ -198,8 +198,8 @@ const CtoOrgDashboard: React.FC<CtoOrgDashboardProps> = ({ refreshKey, project, 
     setSuggestionOpen(true);
   };
 
-  const fmtHours = (h: number) => h < 24 ? `${h.toFixed(1)}h` : `${(h / 24).toFixed(1)}d`;
-  const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`;
+  const fmtHours = (h: number) => h < 24 ? `${h.toFixed(2)}h` : `${(h / 24).toFixed(2)}d`;
+  const fmtPct = (v: number) => `${(v * 100).toFixed(2)}%`;
 
   // Build multi-line throughput data for LineChart
   const throughputLineData = data?.throughputByProject && data.throughputByProject.length > 0
@@ -334,7 +334,7 @@ const CtoOrgDashboard: React.FC<CtoOrgDashboardProps> = ({ refreshKey, project, 
                     <CtoExplainButton label="Flow Efficiency" derivation={TOOLTIPS.flowEfficiency.derivation} dynamicDerivation={data.traces?.flowEfficiency} />
                     {aiConfigured && (
                       <button
-                        onClick={() => openSuggestion('Flow Efficiency', `${data.flowEfficiency.average.toFixed(1)}%`, TOOLTIPS.flowEfficiency.description)}
+                        onClick={() => openSuggestion('Flow Efficiency', `${data.flowEfficiency.average.toFixed(2)}%`, TOOLTIPS.flowEfficiency.description)}
                         className="text-violet-400/40 hover:text-violet-400 transition-colors opacity-0 group-hover:opacity-100"
                         aria-label="AI suggestions"
                       >
@@ -343,7 +343,7 @@ const CtoOrgDashboard: React.FC<CtoOrgDashboardProps> = ({ refreshKey, project, 
                     )}
                     <TrafficDot status={trafficLight('flowEfficiency', data.flowEfficiency.average)} />
                   </div>
-                  <p className="text-xl font-bold text-slate-100">{data.flowEfficiency.average.toFixed(1)}%</p>
+                  <p className="text-xl font-bold text-slate-100">{data.flowEfficiency.average.toFixed(2)}%</p>
                   <span className="text-[10px] text-slate-500">avg active / lead time</span>
                 </div>
               </div>
@@ -355,7 +355,7 @@ const CtoOrgDashboard: React.FC<CtoOrgDashboardProps> = ({ refreshKey, project, 
                 <MetricCard
                   icon={<Users size={16} />}
                   label="Headcount-Normalized Throughput"
-                  value={data.headcountNormalizedThroughput.toFixed(1)}
+                  value={data.headcountNormalizedThroughput.toFixed(2)}
                   color="violet"
                   subtitle="tickets per tracked engineer"
                   tooltip={TOOLTIPS.headcount}
@@ -418,7 +418,7 @@ const CtoOrgDashboard: React.FC<CtoOrgDashboardProps> = ({ refreshKey, project, 
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                     <XAxis dataKey="week" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                     <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#e2e8f0' }} itemStyle={{ color: '#cbd5e1' }} />
+                    <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#e2e8f0' }} itemStyle={{ color: '#cbd5e1' }} formatter={(v: any) => [typeof v === 'number' ? v.toFixed(2) : v, 'Value']} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     {data.throughputByProject.map((proj, i) => (
                       <Line
@@ -456,7 +456,7 @@ const CtoOrgDashboard: React.FC<CtoOrgDashboardProps> = ({ refreshKey, project, 
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                     <XAxis dataKey="week" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                     <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#e2e8f0' }} itemStyle={{ color: '#cbd5e1' }} />
+                    <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#e2e8f0' }} itemStyle={{ color: '#cbd5e1' }} formatter={(v: any) => [typeof v === 'number' ? v.toFixed(2) : v, 'Value']} />
                     <Bar dataKey="count" fill="#8b5cf6" name="Completed" radius={[4, 4, 0, 0]} animationDuration={600} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -473,18 +473,18 @@ const CtoOrgDashboard: React.FC<CtoOrgDashboardProps> = ({ refreshKey, project, 
                   aiConfigured={aiConfigured}
                   onAiSuggest={() => openSuggestion(
                     'Delivery Predictability',
-                    data.deliveryPredictability.map(p => `${p.projectKey}: CoV ${p.coefficientOfVariation.toFixed(0)}%`).join(', '),
+                    data.deliveryPredictability.map(p => `${p.projectKey}: CoV ${p.coefficientOfVariation.toFixed(2)}%`).join(', '),
                     TOOLTIPS.deliveryPredictability.description
                   )}
                 />
                 <ResponsiveContainer width="100%" height={Math.max(120, data.deliveryPredictability.length * 50)}>
                   <BarChart data={data.deliveryPredictability} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                    <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `${v.toFixed(0)}%`} />
+                    <XAxis type="number" tick={{ fill: '#94a3b8', fontSize: 11 }} tickFormatter={(v) => `${v.toFixed(2)}%`} />
                     <YAxis dataKey="projectKey" type="category" tick={{ fill: '#94a3b8', fontSize: 11 }} width={80} />
                     <Tooltip
                       contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#e2e8f0' }} itemStyle={{ color: '#cbd5e1' }}
-                      formatter={(value: number) => [`${value.toFixed(1)}%`, 'CoV']}
+                      formatter={(value: number) => [`${value.toFixed(2)}%`, 'CoV']}
                     />
                     <Bar dataKey="coefficientOfVariation" name="Coefficient of Variation" radius={[0, 4, 4, 0]} animationDuration={800}>
                       {data.deliveryPredictability.map((entry, i) => (
@@ -532,7 +532,7 @@ const CtoOrgDashboard: React.FC<CtoOrgDashboardProps> = ({ refreshKey, project, 
                                 key={t.type}
                                 className="h-full transition-all relative group/bar"
                                 style={{ width: `${pct}%`, backgroundColor: PROJECT_COLORS[i % PROJECT_COLORS.length], minWidth: pct > 0 ? 4 : 0 }}
-                                title={`${t.type}: ${t.count} (${pct.toFixed(0)}%)`}
+                                title={`${t.type}: ${t.count} (${pct.toFixed(2)}%)`}
                               />
                             );
                           })}

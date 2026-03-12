@@ -192,7 +192,7 @@ const DmFlowDashboard: React.FC<DmFlowDashboardProps> = ({ refreshKey, project, 
       if (isMultiProject) {
         await syncAllProjects();
       } else {
-        await triggerSync();
+        await triggerSync(project?.key);
       }
       await fetchData();
       toast.success('Synced & refreshed');
@@ -208,14 +208,14 @@ const DmFlowDashboard: React.FC<DmFlowDashboardProps> = ({ refreshKey, project, 
       metricLabel,
       currentValue,
       helpText: helpText ?? '',
-      context: `DM Flow Dashboard. Period: ${period}. Total tickets: ${data?.totalTickets ?? 0}, WIP: ${data?.wip.count ?? 0}, Flow Efficiency: ${data ? data.flowEfficiency.average.toFixed(0) : 0}%.`,
+      context: `DM Flow Dashboard. Period: ${period}. Total tickets: ${data?.totalTickets ?? 0}, WIP: ${data?.wip.count ?? 0}, Flow Efficiency: ${data ? data.flowEfficiency.average.toFixed(2) : 0}%.`,
     });
     setSuggestionOpen(true);
   };
 
   const fmtHours = (h: number) => {
     if (h === 0) return '—';
-    return h < 24 ? `${h.toFixed(1)}h` : `${(h / 24).toFixed(1)}d`;
+    return h < 24 ? `${h.toFixed(2)}h` : `${(h / 24).toFixed(2)}d`;
   };
 
   // Collect unique statuses for CFD chart from data
@@ -285,12 +285,12 @@ const DmFlowDashboard: React.FC<DmFlowDashboardProps> = ({ refreshKey, project, 
               <MetricCard
                 icon={<Gauge size={16} />}
                 label="Flow Efficiency"
-                value={`${data.flowEfficiency.average.toFixed(0)}%`}
+                value={`${data.flowEfficiency.average.toFixed(2)}%`}
                 color="emerald"
                 tooltip={TOOLTIPS.flowEfficiency}
                 dynamicDerivation={data.traces?.flowEfficiency}
                 aiConfigured={aiConfigured}
-                onAiSuggest={() => openSuggestion('Flow Efficiency', `${data.flowEfficiency.average.toFixed(0)}%`, TOOLTIPS.flowEfficiency.description)}
+                onAiSuggest={() => openSuggestion('Flow Efficiency', `${data.flowEfficiency.average.toFixed(2)}%`, TOOLTIPS.flowEfficiency.description)}
               />
               <MetricCard
                 icon={<Activity size={16} />}
@@ -306,12 +306,12 @@ const DmFlowDashboard: React.FC<DmFlowDashboardProps> = ({ refreshKey, project, 
               <MetricCard
                 icon={<TrendingUp size={16} />}
                 label="Throughput Stability"
-                value={`${(data.throughputStability * 100).toFixed(0)}%`}
+                value={`${(data.throughputStability * 100).toFixed(2)}%`}
                 color="amber"
                 tooltip={TOOLTIPS.throughputStability}
                 dynamicDerivation={data.traces?.throughputStability}
                 aiConfigured={aiConfigured}
-                onAiSuggest={() => openSuggestion('Throughput Stability', `${(data.throughputStability * 100).toFixed(0)}%`, TOOLTIPS.throughputStability.description)}
+                onAiSuggest={() => openSuggestion('Throughput Stability', `${(data.throughputStability * 100).toFixed(2)}%`, TOOLTIPS.throughputStability.description)}
               />
               <MetricCard
                 icon={<ArrowLeftRight size={16} />}
@@ -506,14 +506,14 @@ const DmFlowDashboard: React.FC<DmFlowDashboardProps> = ({ refreshKey, project, 
                     title="Batch Size Trend (avg SP/ticket)"
                     tooltip={TOOLTIPS.batchSizeTrend}
                     aiConfigured={aiConfigured}
-                    onAiSuggest={() => openSuggestion('Batch Size Trend', data.batchSizeTrend.slice(-4).map(e => `${e.week}: ${e.avgSp.toFixed(1)} SP`).join(', '), TOOLTIPS.batchSizeTrend.description)}
+                    onAiSuggest={() => openSuggestion('Batch Size Trend', data.batchSizeTrend.slice(-4).map(e => `${e.week}: ${e.avgSp.toFixed(2)} SP`).join(', '), TOOLTIPS.batchSizeTrend.description)}
                   />
                   <ResponsiveContainer width="100%" height={200}>
                     <LineChart data={data.batchSizeTrend}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                       <XAxis dataKey="week" tick={{ fill: '#94a3b8', fontSize: 10 }} />
                       <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                      <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#e2e8f0' }} itemStyle={{ color: '#cbd5e1' }} formatter={(v: number) => [v.toFixed(1), 'Avg SP']} />
+                      <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#e2e8f0' }} itemStyle={{ color: '#cbd5e1' }} formatter={(v: number) => [v.toFixed(2), 'Avg SP']} />
                       <Line type="monotone" dataKey="avgSp" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 2 }} name="Avg SP/ticket" />
                     </LineChart>
                   </ResponsiveContainer>
@@ -528,7 +528,7 @@ const DmFlowDashboard: React.FC<DmFlowDashboardProps> = ({ refreshKey, project, 
                   title="Lead Time Breakdown"
                   tooltip={TOOLTIPS.leadTimeBreakdown}
                   aiConfigured={aiConfigured}
-                  onAiSuggest={() => openSuggestion('Lead Time Breakdown', `Active: ${data.leadTimeBreakdown!.activePercent.toFixed(0)}%, Wait: ${data.leadTimeBreakdown!.waitPercent.toFixed(0)}%, Blocked: ${data.leadTimeBreakdown!.blockedPercent.toFixed(0)}%`, TOOLTIPS.leadTimeBreakdown.description)}
+                  onAiSuggest={() => openSuggestion('Lead Time Breakdown', `Active: ${data.leadTimeBreakdown!.activePercent.toFixed(2)}%, Wait: ${data.leadTimeBreakdown!.waitPercent.toFixed(2)}%, Blocked: ${data.leadTimeBreakdown!.blockedPercent.toFixed(2)}%`, TOOLTIPS.leadTimeBreakdown.description)}
                 />
                 <div className="space-y-3 mt-2">
                   {[
@@ -541,7 +541,7 @@ const DmFlowDashboard: React.FC<DmFlowDashboardProps> = ({ refreshKey, project, 
                       <div className="flex-1 bg-slate-800/50 rounded-full h-4 overflow-hidden">
                         <div className={`h-full ${item.color} rounded-full transition-all`} style={{ width: `${Math.min(item.pct, 100)}%` }} />
                       </div>
-                      <span className="text-xs text-slate-300 w-12 text-right">{item.pct.toFixed(0)}%</span>
+                      <span className="text-xs text-slate-300 w-12 text-right">{item.pct.toFixed(2)}%</span>
                     </div>
                   ))}
                 </div>

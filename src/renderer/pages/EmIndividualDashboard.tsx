@@ -150,7 +150,7 @@ const EmIndividualDashboard: React.FC<EmIndividualDashboardProps> = ({ refreshKe
       if (isMultiProject) {
         await syncAllProjects();
       } else {
-        await triggerSync();
+        await triggerSync(project?.key);
       }
       await fetchData();
       toast.success('Synced & refreshed');
@@ -176,17 +176,17 @@ const EmIndividualDashboard: React.FC<EmIndividualDashboardProps> = ({ refreshKe
       metricLabel: `${eng.displayName} — Individual Metrics`,
       currentValue: `${eng.tickets} tickets, ${eng.storyPoints} SP`,
       helpText: 'Per-engineer performance metrics with team comparison',
-      context: `Engineer: ${eng.displayName}. Cycle p50: ${fmtHours(eng.cycleTimeP50)}, Rework: ${fmtPct(eng.reworkRate)}, Bug ratio: ${fmtPct(eng.bugRatio)}, Complexity: ${eng.complexityScore?.toFixed(1) ?? 'N/A'}, Focus: ${eng.focusRatio != null ? fmtPct(eng.focusRatio) : 'N/A'}. Team avg cycle p50: ${fmtHours(data?.teamAverages.cycleTimeP50 ?? null)}, rework: ${fmtPct(data?.teamAverages.reworkRate ?? 0)}, bug ratio: ${fmtPct(data?.teamAverages.bugRatio ?? 0)}.`,
+      context: `Engineer: ${eng.displayName}. Cycle p50: ${fmtHours(eng.cycleTimeP50)}, Rework: ${fmtPct(eng.reworkRate)}, Bug ratio: ${fmtPct(eng.bugRatio)}, Complexity: ${eng.complexityScore?.toFixed(2) ?? 'N/A'}, Focus: ${eng.focusRatio != null ? fmtPct(eng.focusRatio) : 'N/A'}. Team avg cycle p50: ${fmtHours(data?.teamAverages.cycleTimeP50 ?? null)}, rework: ${fmtPct(data?.teamAverages.reworkRate ?? 0)}, bug ratio: ${fmtPct(data?.teamAverages.bugRatio ?? 0)}.`,
     });
     setSuggestionOpen(true);
   };
 
   const fmtHours = (h: number | null) => {
     if (h == null || h === 0) return '—';
-    return h < 24 ? `${h.toFixed(1)}h` : `${(h / 24).toFixed(1)}d`;
+    return h < 24 ? `${h.toFixed(2)}h` : `${(h / 24).toFixed(2)}d`;
   };
 
-  const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`;
+  const fmtPct = (v: number) => `${(v * 100).toFixed(2)}%`;
 
   const compareToAvg = (value: number | null, avg: number | null, lowerIsBetter = false): string => {
     if (value == null || avg == null || avg === 0) return '';
@@ -346,7 +346,7 @@ const EmIndividualDashboard: React.FC<EmIndividualDashboardProps> = ({ refreshKe
                         <CardHelp text={CARD_HELP.storyPoints.text} derivation={CARD_HELP.storyPoints.derivation} dynamicDerivation={data.traces?.teamAvg} label="Story Points" />
                       </div>
                       <p className="text-xl font-bold text-cyan-400">{avg.storyPoints}</p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">{avg.tickets > 0 ? `${(avg.storyPoints / avg.tickets).toFixed(1)} SP/ticket` : '—'}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">{avg.tickets > 0 ? `${(avg.storyPoints / avg.tickets).toFixed(2)} SP/ticket` : '—'}</p>
                     </div>
                   </div>
                 </div>
@@ -397,8 +397,8 @@ const EmIndividualDashboard: React.FC<EmIndividualDashboardProps> = ({ refreshKe
                         <MetricPill label="Cycle p50" value={fmtHours(eng.cycleTimeP50)} colorClass={compareToAvg(eng.cycleTimeP50, data.teamAverages.cycleTimeP50, true)} />
                         <MetricPill label="Rework" value={fmtPct(eng.reworkRate)} colorClass={compareToAvg(eng.reworkRate, data.teamAverages.reworkRate, true)} />
                         <MetricPill label="Bug Ratio" value={fmtPct(eng.bugRatio)} colorClass={compareToAvg(eng.bugRatio, data.teamAverages.bugRatio, true)} />
-                        <MetricPill label="SP Acc" value={eng.spAccuracy != null ? `${eng.spAccuracy.toFixed(0)}%` : '—'} colorClass={eng.spAccuracy != null ? (eng.spAccuracy >= 80 && eng.spAccuracy <= 120 ? 'text-emerald-400' : 'text-amber-400') : ''} />
-                        <MetricPill label="Pass %" value={`${(eng.firstTimePassRate * 100).toFixed(0)}%`} colorClass={compareToAvg(eng.firstTimePassRate, data.teamAverages.firstTimePassRate, false)} />
+                        <MetricPill label="SP Acc" value={eng.spAccuracy != null ? `${eng.spAccuracy.toFixed(2)}%` : '—'} colorClass={eng.spAccuracy != null ? (eng.spAccuracy >= 80 && eng.spAccuracy <= 120 ? 'text-emerald-400' : 'text-amber-400') : ''} />
+                        <MetricPill label="Pass %" value={`${(eng.firstTimePassRate * 100).toFixed(2)}%`} colorClass={compareToAvg(eng.firstTimePassRate, data.teamAverages.firstTimePassRate, false)} />
                         <MetricPill label="Tickets" value={String(eng.tickets)} colorClass="" />
                         <MetricPill label="SP" value={String(eng.storyPoints)} colorClass="" />
                       </button>
@@ -418,9 +418,9 @@ const EmIndividualDashboard: React.FC<EmIndividualDashboardProps> = ({ refreshKe
                         <DetailItem label="Cycle Time p85" value={fmtHours(eng.cycleTimeP85)} />
                         <DetailItem label="Rework Rate" value={fmtPct(eng.reworkRate)} />
                         <DetailItem label="Bug Ratio" value={fmtPct(eng.bugRatio)} />
-                        <DetailItem label="SP Accuracy" value={eng.spAccuracy != null ? `${eng.spAccuracy.toFixed(0)}%` : '—'} />
+                        <DetailItem label="SP Accuracy" value={eng.spAccuracy != null ? `${eng.spAccuracy.toFixed(2)}%` : '—'} />
                         <DetailItem label="First-Time Pass" value={fmtPct(eng.firstTimePassRate)} />
-                        <DetailItem label="Complexity" value={eng.complexityScore != null ? eng.complexityScore.toFixed(1) : '—'} />
+                        <DetailItem label="Complexity" value={eng.complexityScore != null ? eng.complexityScore.toFixed(2) : '—'} />
                         <DetailItem label="Focus Ratio" value={eng.focusRatio != null ? fmtPct(eng.focusRatio) : '—'} />
                         <DetailItem label="Total Tickets" value={String(eng.tickets)} />
                         <DetailItem label="Total SP" value={String(eng.storyPoints)} />

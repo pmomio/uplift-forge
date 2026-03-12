@@ -101,7 +101,7 @@ const EmTeamDashboard: React.FC<EmTeamDashboardProps> = ({ refreshKey, project, 
       if (isMultiProject) {
         await syncAllProjects();
       } else {
-        await triggerSync();
+        await triggerSync(project?.key);
       }
       await fetchData();
       toast.success('Synced & refreshed');
@@ -197,7 +197,7 @@ const EmTeamDashboard: React.FC<EmTeamDashboardProps> = ({ refreshKey, project, 
           />
           <MetricCard
             title="Cycle Time p50"
-            value={Math.round(data?.cycleTime.p50 ?? 0)}
+            value={(data?.cycleTime.p50 ?? 0).toFixed(2)}
             unit="hours"
             icon={<Clock size={20} />}
             tooltip={TOOLTIPS.cycleTimeP50}
@@ -207,7 +207,7 @@ const EmTeamDashboard: React.FC<EmTeamDashboardProps> = ({ refreshKey, project, 
           />
           <MetricCard
             title="Rework Rate"
-            value={data?.reworkRate ?? 0}
+            value={(data?.reworkRate ?? 0).toFixed(2)}
             unit="%"
             icon={<RotateCcw size={20} />}
             tooltip={TOOLTIPS.reworkRate}
@@ -217,7 +217,7 @@ const EmTeamDashboard: React.FC<EmTeamDashboardProps> = ({ refreshKey, project, 
           />
           <MetricCard
             title="SP Accuracy"
-            value={data?.spAccuracy}
+            value={(data?.spAccuracy ?? 0).toFixed(2)}
             unit="%"
             icon={<Target size={20} />}
             tooltip={TOOLTIPS.spAccuracy}
@@ -227,7 +227,7 @@ const EmTeamDashboard: React.FC<EmTeamDashboardProps> = ({ refreshKey, project, 
           />
           <MetricCard
             title="Review Duration"
-            value={data?.avgReviewDurationHours}
+            value={(data?.avgReviewDurationHours ?? 0).toFixed(2)}
             unit="hours"
             icon={<Timer size={20} />}
             tooltip={TOOLTIPS.avgReviewDuration}
@@ -237,7 +237,7 @@ const EmTeamDashboard: React.FC<EmTeamDashboardProps> = ({ refreshKey, project, 
           />
           <MetricCard
             title="Unestimated Ratio"
-            value={data?.unestimatedRatio ?? 0}
+            value={(data?.unestimatedRatio ?? 0).toFixed(2)}
             unit="%"
             icon={<AlertTriangle size={20} />}
             tooltip={TOOLTIPS.unestimatedRatio}
@@ -271,6 +271,7 @@ const EmTeamDashboard: React.FC<EmTeamDashboardProps> = ({ refreshKey, project, 
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px', fontSize: '12px' }}
                     itemStyle={{ padding: '2px 0' }}
+                    formatter={(v: any) => [typeof v === 'number' ? v.toFixed(2) : v, 'Value']}
                   />
                   <Legend verticalAlign="top" align="right" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
                   <Area type="monotone" dataKey="p50" name="p50 (Median)" stroke="#818cf8" strokeWidth={3} fillOpacity={1} fill="url(#colorP50)" />
@@ -297,6 +298,7 @@ const EmTeamDashboard: React.FC<EmTeamDashboardProps> = ({ refreshKey, project, 
                   <YAxis yAxisId="right" orientation="right" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} dx={10} />
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px', fontSize: '12px' }}
+                    formatter={(v: any) => [typeof v === 'number' ? v.toFixed(2) : v, 'Value']}
                   />
                   <Bar yAxisId="left" dataKey="count" name="Tickets" fill="#818cf8" radius={[4, 4, 0, 0]} barSize={30} />
                   <Bar yAxisId="right" dataKey="storyPoints" name="Story Points" fill="#34d399" radius={[4, 4, 0, 0]} barSize={10} />
@@ -336,6 +338,7 @@ const EmTeamDashboard: React.FC<EmTeamDashboardProps> = ({ refreshKey, project, 
                     <Tooltip 
                       cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                       contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px', fontSize: '12px' }}
+                      formatter={(v: any) => [typeof v === 'number' ? v.toFixed(2) : v, 'Value']}
                     />
                     <Bar dataKey="count" name="Tickets" fill="#818cf8" radius={[0, 4, 4, 0]} barSize={20} label={{ position: 'right', fill: '#94a3b8', fontSize: 10 }} />
                   </BarChart>
@@ -359,23 +362,23 @@ const EmTeamDashboard: React.FC<EmTeamDashboardProps> = ({ refreshKey, project, 
                     <div 
                       className="bg-emerald-500 flex items-center justify-center text-[10px] font-bold text-emerald-950"
                       style={{ width: `${data.leadTimeBreakdown.activePercent}%` }}
-                      title={`Active: ${data.leadTimeBreakdown.activePercent.toFixed(1)}%`}
+                      title={`Active: ${data.leadTimeBreakdown.activePercent.toFixed(2)}%`}
                     >
-                      {data.leadTimeBreakdown.activePercent > 10 && `${data.leadTimeBreakdown.activePercent.toFixed(0)}%`}
+                      {data.leadTimeBreakdown.activePercent > 10 && `${data.leadTimeBreakdown.activePercent.toFixed(2)}%`}
                     </div>
                     <div 
                       className="bg-indigo-500 flex items-center justify-center text-[10px] font-bold text-indigo-950"
                       style={{ width: `${data.leadTimeBreakdown.waitPercent}%` }}
-                      title={`Waiting: ${data.leadTimeBreakdown.waitPercent.toFixed(1)}%`}
+                      title={`Waiting: ${data.leadTimeBreakdown.waitPercent.toFixed(2)}%`}
                     >
-                      {data.leadTimeBreakdown.waitPercent > 10 && `${data.leadTimeBreakdown.waitPercent.toFixed(0)}%`}
+                      {data.leadTimeBreakdown.waitPercent > 10 && `${data.leadTimeBreakdown.waitPercent.toFixed(2)}%`}
                     </div>
                     <div 
                       className="bg-rose-500 flex items-center justify-center text-[10px] font-bold text-rose-950"
                       style={{ width: `${data.leadTimeBreakdown.blockedPercent}%` }}
-                      title={`Blocked: ${data.leadTimeBreakdown.blockedPercent.toFixed(1)}%`}
+                      title={`Blocked: ${data.leadTimeBreakdown.blockedPercent.toFixed(2)}%`}
                     >
-                      {data.leadTimeBreakdown.blockedPercent > 10 && `${data.leadTimeBreakdown.blockedPercent.toFixed(0)}%`}
+                      {data.leadTimeBreakdown.blockedPercent > 10 && `${data.leadTimeBreakdown.blockedPercent.toFixed(2)}%`}
                     </div>
                   </div>
                   <div className="flex justify-center gap-8 text-xs font-medium">
@@ -443,7 +446,7 @@ const EmTeamDashboard: React.FC<EmTeamDashboardProps> = ({ refreshKey, project, 
                           {wip.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs font-mono text-slate-300">{wip.daysInStatus.toFixed(1)}d</td>
+                      <td className="px-4 py-3 text-xs font-mono text-slate-300">{wip.daysInStatus.toFixed(2)}d</td>
                       <td className="px-4 py-3">
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
                           wip.severity === 'escalation' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :

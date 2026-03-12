@@ -54,9 +54,9 @@ describe('CtoOrgDashboard', () => {
     render(<CtoOrgDashboard refreshKey={0} project={null} />);
     await waitFor(() => {
       expect(screen.getByText('42')).toBeInTheDocument();
-      expect(screen.getByText('12.0%')).toBeInTheDocument();
-      expect(screen.getByText('25.0%')).toBeInTheDocument();
-      expect(screen.getByText('35.0%')).toBeInTheDocument();
+      expect(screen.getByText('12.00%')).toBeInTheDocument();
+      expect(screen.getByText('25.00%')).toBeInTheDocument();
+      expect(screen.getByText('35.00%')).toBeInTheDocument();
     });
   });
 
@@ -79,7 +79,7 @@ describe('CtoOrgDashboard', () => {
   it('shows headcount-normalized throughput', async () => {
     render(<CtoOrgDashboard refreshKey={0} project={null} />);
     await waitFor(() => {
-      expect(screen.getByText('4.2')).toBeInTheDocument();
+      expect(screen.getByText('4.20')).toBeInTheDocument();
       expect(screen.getByText('Headcount-Normalized Throughput')).toBeInTheDocument();
     });
   });

@@ -73,7 +73,7 @@ describe('IcPersonalDashboard', () => {
     await waitFor(() => {
       expect(screen.getByText('12')).toBeInTheDocument(); // tickets
       expect(screen.getByText('35')).toBeInTheDocument(); // story points
-      expect(screen.getByText('15%')).toBeInTheDocument(); // rework rate
+      expect(screen.getByText('15.00%')).toBeInTheDocument(); // rework rate
     });
   });
 

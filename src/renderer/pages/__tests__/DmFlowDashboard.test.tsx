@@ -84,9 +84,9 @@ describe('DmFlowDashboard', () => {
   it('renders KPI cards with data', async () => {
     render(<DmFlowDashboard refreshKey={0} project={null} />);
     await waitFor(() => {
-      expect(screen.getByText('65%')).toBeInTheDocument(); // flow efficiency
+      expect(screen.getByText('65.00%')).toBeInTheDocument(); // flow efficiency
       expect(screen.getByText('8')).toBeInTheDocument(); // WIP count
-      expect(screen.getByText('72%')).toBeInTheDocument(); // throughput stability
+      expect(screen.getByText('72.00%')).toBeInTheDocument(); // throughput stability
     });
   });
 

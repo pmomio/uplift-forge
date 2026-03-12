@@ -107,12 +107,17 @@ describe('EmIndividualDashboard', () => {
     });
   });
 
-  it('shows dynamic trace in explain modal when available', async () => {
+  it('shows metrics with 2 decimal places when expanded', async () => {
     render(<EmIndividualDashboard refreshKey={0} project={null} />);
-    await waitFor(() => screen.getByLabelText('Explain: Cycle p50'));
-    fireEvent.click(screen.getByLabelText('Explain: Cycle p50'));
+    await waitFor(() => screen.getByText('Alice'));
+    fireEvent.click(screen.getByText('Alice'));
     await waitFor(() => {
-      expect(screen.getByText(/3 timelines → period filter/)).toBeInTheDocument();
+      // Use getAllByText and find the one we want, or use more specific query
+      // Complexity is 2.5 in mock, should be 2.50
+      expect(screen.getByText('2.50')).toBeInTheDocument();
+      // SP Accuracy is 95 in mock, should be 95.00%
+      const spAccElements = screen.getAllByText('95.00%');
+      expect(spAccElements.length).toBeGreaterThanOrEqual(1);
     });
   });
 });

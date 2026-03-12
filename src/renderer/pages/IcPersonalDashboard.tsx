@@ -195,7 +195,7 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
       if (isMultiProject) {
         await syncAllProjects();
       } else {
-        await triggerSync();
+        await triggerSync(project?.key);
       }
       await fetchData();
       toast.success('Synced & refreshed');
@@ -211,14 +211,14 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
       metricLabel,
       currentValue,
       helpText: helpText ?? '',
-      context: `IC Personal Dashboard. Period: ${period}. Tickets: ${data?.totalTickets ?? 0}, SP: ${data?.totalStoryPoints ?? 0}, Rework rate: ${data ? (data.reworkRate * 100).toFixed(0) : 0}%.`,
+      context: `IC Personal Dashboard. Period: ${period}. Tickets: ${data?.totalTickets ?? 0}, SP: ${data?.totalStoryPoints ?? 0}, Rework rate: ${data ? (data.reworkRate * 100).toFixed(2) : 0}%.`,
     });
     setSuggestionOpen(true);
   };
 
   const fmtHours = (h: number | null) => {
     if (h == null || h === 0) return '—';
-    return h < 24 ? `${h.toFixed(1)}h` : `${(h / 24).toFixed(1)}d`;
+    return h < 24 ? `${h.toFixed(2)}h` : `${(h / 24).toFixed(2)}d`;
   };
 
   return (
@@ -305,7 +305,7 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
                 return (
                   <span className={`inline-flex items-center gap-0.5 text-[10px] font-medium ${color}`}>
                     <Icon size={10} />
-                    {absChange.toFixed(0)}%
+                    {absChange.toFixed(2)}%
                   </span>
                 );
               };
@@ -353,14 +353,14 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
                         <span className={`w-2 h-2 rounded-full ${healthDots[reworkHealth]} ${reworkHealth !== 'good' ? 'animate-pulse' : ''}`} />
                         <IcExplainButton label="Rework Rate" derivation={TOOLTIPS.reworkRate.derivation} dynamicDerivation={data.traces?.reworkRate} />
                         {aiConfigured && (
-                          <button onClick={() => openSuggestion('Rework Rate', `${reworkPct.toFixed(0)}%`, TOOLTIPS.reworkRate.description)} className="text-violet-400/40 hover:text-violet-400 transition-colors opacity-0 group-hover:opacity-100" aria-label="AI suggestions">
+                          <button onClick={() => openSuggestion('Rework Rate', `${reworkPct.toFixed(2)}%`, TOOLTIPS.reworkRate.description)} className="text-violet-400/40 hover:text-violet-400 transition-colors opacity-0 group-hover:opacity-100" aria-label="AI suggestions">
                             <Sparkles size={11} />
                           </button>
                         )}
                       </div>
                     </div>
                     <div className="flex items-end justify-between">
-                      <p className={`text-2xl font-bold ${healthColors[reworkHealth]}`}>{reworkPct.toFixed(0)}%</p>
+                      <p className={`text-2xl font-bold ${healthColors[reworkHealth]}`}>{reworkPct.toFixed(2)}%</p>
                       <TrendArrow change={rwChange} invertColor />
                     </div>
                     <p className="text-[10px] text-slate-500 mt-1">
@@ -410,7 +410,7 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
                     <div className="flex items-end justify-between">
                       <p className="text-2xl font-bold text-indigo-400">{data.totalStoryPoints}</p>
                       <span className="text-[10px] text-slate-500">
-                        {data.totalTickets > 0 ? `${(data.totalStoryPoints / data.totalTickets).toFixed(1)} SP/ticket` : '—'}
+                        {data.totalTickets > 0 ? `${(data.totalStoryPoints / data.totalTickets).toFixed(2)} SP/ticket` : '—'}
                       </span>
                     </div>
                     <p className="text-[10px] text-slate-500 mt-1">{data.totalTickets} tickets delivered</p>
@@ -451,7 +451,7 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
                       {spAccHealth && <span className={`w-2 h-2 rounded-full ${healthDots[spAccHealth]} ${spAccHealth !== 'good' ? 'animate-pulse' : ''}`} />}
                     </div>
                     <p className={`text-2xl font-bold ${spAccHealth ? healthColors[spAccHealth] : 'text-slate-400'}`}>
-                      {data.spAccuracy != null ? `${data.spAccuracy.toFixed(0)}%` : 'N/A'}
+                      {data.spAccuracy != null ? `${data.spAccuracy.toFixed(2)}%` : 'N/A'}
                     </p>
                     <p className="text-[10px] text-slate-500 mt-1">
                       {spAccHealth === 'good' ? 'Well calibrated' : spAccHealth === 'ok' ? 'Room to improve' : spAccHealth === 'bad' ? 'Needs attention' : 'No data'}
@@ -471,7 +471,7 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
                       <span className={`w-2 h-2 rounded-full ${healthDots[fprHealth]} ${fprHealth !== 'good' ? 'animate-pulse' : ''}`} />
                     </div>
                     <p className={`text-2xl font-bold ${healthColors[fprHealth]}`}>
-                      {(data.firstTimePassRate * 100).toFixed(0)}%
+                      {(data.firstTimePassRate * 100).toFixed(2)}%
                     </p>
                     <p className="text-[10px] text-slate-500 mt-1">
                       {fprHealth === 'good' ? 'Excellent quality' : fprHealth === 'ok' ? 'Some rework' : 'High rework'}
@@ -511,7 +511,7 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
                       {focusHealth && <span className={`w-2 h-2 rounded-full ${healthDots[focusHealth]} ${focusHealth !== 'good' ? 'animate-pulse' : ''}`} />}
                     </div>
                     <p className={`text-2xl font-bold ${focusHealth ? healthColors[focusHealth] : 'text-slate-400'}`}>
-                      {data.focusScore != null ? `${(data.focusScore * 100).toFixed(0)}%` : 'N/A'}
+                      {data.focusScore != null ? `${(data.focusScore * 100).toFixed(2)}%` : 'N/A'}
                     </p>
                     <p className="text-[10px] text-slate-500 mt-1">
                       {focusHealth === 'good' ? 'Product-focused' : focusHealth === 'ok' ? 'Mixed work' : focusHealth === 'bad' ? 'Bug-heavy' : 'No data'}
@@ -559,7 +559,7 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                     <XAxis dataKey="week" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                     <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#e2e8f0' }} itemStyle={{ color: '#cbd5e1' }} />
+                    <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#e2e8f0' }} itemStyle={{ color: '#cbd5e1' }} formatter={(v: any) => [typeof v === 'number' ? v.toFixed(2) : v, 'Value']} />
                     <Bar dataKey="value" fill="#10b981" name="Tickets Done" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -573,7 +573,7 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
                   title="Time in Each Status"
                   tooltip={TOOLTIPS.timeInStatus}
                   aiConfigured={aiConfigured}
-                  onAiSuggest={() => openSuggestion('Time in Each Status', data.timeInStatus.map(s => `${s.status}: ${s.percentage.toFixed(0)}%`).join(', '), TOOLTIPS.timeInStatus.description)}
+                  onAiSuggest={() => openSuggestion('Time in Each Status', data.timeInStatus.map(s => `${s.status}: ${s.percentage.toFixed(2)}%`).join(', '), TOOLTIPS.timeInStatus.description)}
                 />
                 <div className="space-y-2">
                   {data.timeInStatus.map(s => (
@@ -585,7 +585,7 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
                           style={{ width: `${Math.min(s.percentage, 100)}%` }}
                         />
                       </div>
-                      <span className="text-xs text-slate-300 w-16 text-right">{s.percentage.toFixed(0)}%</span>
+                      <span className="text-xs text-slate-300 w-16 text-right">{s.percentage.toFixed(2)}%</span>
                       <span className="text-xs text-slate-500 w-16 text-right">{fmtHours(s.hours)}</span>
                     </div>
                   ))}
@@ -600,14 +600,14 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
                   title="Scope Trajectory (avg SP/ticket by month)"
                   tooltip={TOOLTIPS.scopeTrajectory}
                   aiConfigured={aiConfigured}
-                  onAiSuggest={() => openSuggestion('Scope Trajectory', data.scopeTrajectory.map(s => `${s.month}: ${s.avgSp.toFixed(1)} SP`).join(', '), TOOLTIPS.scopeTrajectory.description)}
+                  onAiSuggest={() => openSuggestion('Scope Trajectory', data.scopeTrajectory.map(s => `${s.month}: ${s.avgSp.toFixed(2)} SP`).join(', '), TOOLTIPS.scopeTrajectory.description)}
                 />
                 <ResponsiveContainer width="100%" height={160}>
                   <LineChart data={data.scopeTrajectory}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
                     <XAxis dataKey="month" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                     <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                    <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#e2e8f0' }} itemStyle={{ color: '#cbd5e1' }} />
+                    <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} labelStyle={{ color: '#e2e8f0' }} itemStyle={{ color: '#cbd5e1' }} formatter={(v: any) => [typeof v === 'number' ? v.toFixed(2) : v, 'Value']} />
                     <Line type="monotone" dataKey="avgSp" stroke="#06b6d4" strokeWidth={2} dot={{ r: 3 }} name="Avg SP" />
                   </LineChart>
                 </ResponsiveContainer>
@@ -631,7 +631,7 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
                       <span className="text-xs text-slate-200 flex-1 truncate">{item.summary}</span>
                       <span className="text-xs text-slate-400">{item.status}</span>
                       <span className={`text-xs font-semibold ${item.daysInStatus > 7 ? 'text-rose-400' : item.daysInStatus > 3 ? 'text-amber-400' : 'text-slate-300'}`}>
-                        {item.daysInStatus}d
+                        {item.daysInStatus.toFixed(2)}d
                       </span>
                     </div>
                   ))}
@@ -646,15 +646,15 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
                   title="Team Comparison (anonymous)"
                   tooltip={TOOLTIPS.teamComparison}
                   aiConfigured={aiConfigured}
-                  onAiSuggest={() => openSuggestion('Team Comparison', data.teamComparison?.map(tc => `${tc.metric}: You ${tc.myValue.toFixed(1)} vs Team ${tc.teamMedian.toFixed(1)}`).join(', ') ?? null, TOOLTIPS.teamComparison.description)}
+                  onAiSuggest={() => openSuggestion('Team Comparison', data.teamComparison?.map(tc => `${tc.metric}: You ${tc.myValue.toFixed(2)} vs Team ${tc.teamMedian.toFixed(2)}`).join(', ') ?? null, TOOLTIPS.teamComparison.description)}
                 />
                 <div className="space-y-3">
                   {data.teamComparison.map(tc => (
                     <div key={tc.metric} className="flex items-center gap-4">
                       <span className="text-xs text-slate-400 w-40">{tc.metric}</span>
                       <div className="flex gap-4 flex-1">
-                        <span className="text-xs text-indigo-300">You: {tc.myValue.toFixed(1)}</span>
-                        <span className="text-xs text-slate-400">Team median: {tc.teamMedian.toFixed(1)}</span>
+                        <span className="text-xs text-indigo-300">You: {tc.myValue.toFixed(2)}</span>
+                        <span className="text-xs text-slate-400">Team median: {tc.teamMedian.toFixed(2)}</span>
                       </div>
                     </div>
                   ))}
@@ -670,7 +670,7 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
                   icon={<Target size={16} className="text-emerald-400" />}
                   tooltip={TOOLTIPS.goalProgress}
                   aiConfigured={aiConfigured}
-                  onAiSuggest={() => openSuggestion('Goal Progress', data.goalProgress?.map(g => `${g.metric}: ${g.current.toFixed(0)}/${g.target}`).join(', ') ?? null, TOOLTIPS.goalProgress.description)}
+                  onAiSuggest={() => openSuggestion('Goal Progress', data.goalProgress?.map(g => `${g.metric}: ${g.current.toFixed(2)}/${g.target}`).join(', ') ?? null, TOOLTIPS.goalProgress.description)}
                 />
                 <div className="space-y-3">
                   {data.goalProgress.map(g => {
@@ -679,7 +679,7 @@ const IcPersonalDashboard: React.FC<IcPersonalDashboardProps> = ({ refreshKey, p
                       <div key={g.metric}>
                         <div className="flex justify-between text-xs mb-1">
                           <span className="text-slate-300">{g.metric}</span>
-                          <span className="text-slate-400">{g.current.toFixed(1)} / {g.target}</span>
+                          <span className="text-slate-400">{g.current.toFixed(2)} / {g.target}</span>
                         </div>
                         <div className="bg-slate-800/50 rounded-full h-2.5 overflow-hidden">
                           <div
